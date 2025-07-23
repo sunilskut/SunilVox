@@ -13,7 +13,7 @@
 
         body {
             font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            background: linear-gradient(135deg, #2d5a27 0%, #4a7c59 50%, #6b8e58 100%);
             min-height: 100vh;
             padding: 20px;
         }
@@ -25,16 +25,24 @@
             backdrop-filter: blur(10px);
             border-radius: 20px;
             padding: 40px;
-            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.1);
+            box-shadow: 0 20px 40px rgba(45, 90, 39, 0.2);
         }
-
-        h1 {
+	h1 {
             text-align: center;
             color: #333;
             margin-bottom: 30px;
             font-size: 1.8em;
             font-weight: 700;
-            background: linear-gradient(45deg, #667eea, #764ba2);
+
+        }
+
+        h2 {
+            text-align: center;
+            color: #333;
+            margin-bottom: 30px;
+            font-size: 1.2em;
+            font-weight: 600;
+            background: linear-gradient(45deg, #2d5a27, #4a7c59);
             -webkit-background-clip: text;
             -webkit-text-fill-color: transparent;
         }
@@ -63,8 +71,8 @@
 
         input:focus, textarea:focus, select:focus {
             outline: none;
-            border-color: #667eea;
-            box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+            border-color: #4a7c59;
+            box-shadow: 0 0 0 3px rgba(74, 124, 89, 0.15);
             transform: translateY(-2px);
         }
 
@@ -86,8 +94,8 @@
         }
 
         .tags-input {
-            background: #f8f9fa;
-            border: 2px dashed #ddd;
+            background: #f0f8f0;
+            border: 2px dashed #4a7c59;
             min-height: 60px;
             display: flex;
             flex-wrap: wrap;
@@ -97,7 +105,7 @@
         }
 
         .tag {
-            background: linear-gradient(45deg, #667eea, #764ba2);
+            background: linear-gradient(45deg, #2d5a27, #4a7c59);
             color: white;
             padding: 6px 12px;
             border-radius: 20px;
@@ -140,7 +148,7 @@
         .submit-btn {
             width: 100%;
             padding: 18px;
-            background: linear-gradient(45deg, #667eea, #764ba2);
+            background: linear-gradient(45deg, #2d5a27, #4a7c59);
             color: white;
             border: none;
             border-radius: 10px;
@@ -154,7 +162,8 @@
 
         .submit-btn:hover {
             transform: translateY(-2px);
-            box-shadow: 0 10px 20px rgba(102, 126, 234, 0.3);
+            box-shadow: 0 10px 20px rgba(74, 124, 89, 0.3);
+            background: linear-gradient(45deg, #3a6b2f, #52865d);
         }
 
         .submit-btn:disabled {
@@ -174,9 +183,9 @@
         }
 
         .status-message.success {
-            background: #d4edda;
-            color: #155724;
-            border: 1px solid #c3e6cb;
+            background: #d4f2d4;
+            color: #1e5a1e;
+            border: 1px solid #a6e6a6;
         }
 
         .status-message.error {
@@ -189,6 +198,11 @@
             opacity: 1;
         }
 
+        .loading {
+            display: inline-block;
+            animation: pulse 1.5s ease-in-out infinite;
+        }
+
         @keyframes tagAppear {
             from {
                 opacity: 0;
@@ -198,6 +212,12 @@
                 opacity: 1;
                 transform: scale(1);
             }
+        }
+
+        @keyframes pulse {
+            0% { opacity: 1; }
+            50% { opacity: 0.5; }
+            100% { opacity: 1; }
         }
 
         .grid-2 {
@@ -233,17 +253,31 @@
             }
         }
     </style>
+<script>
+ // Clear All fields data
+    function clearAll() {
+        document.getElementById('name').value = '';
+        document.getElementById('category').value = '';
+        document.getElementById('brand').value = '';
+        document.getElementById('description').value = '';
+        document.getElementById('price').value = '';
+        document.getElementById('originalPrice').value = '';
+        document.getElementById('imageUrl').value = '';
+        document.getElementById('rating').value = '';
+        document.getElementById('reviewCount').value = '';
+        document.getElementById('badge').value = '';
+        document.getElementById('deliveryDate').value = '';
+        tags = [''];
+        renderTags();
+    }
+</script>
 </head>
 <body>
     <div class="container">
-        <h1>📦 Add a Product</h1>
-        
+        <h2 id="shopHeading" class="loading">🌿 Loading Shop Name...</h2>
+       <center> <h1  class="loading"><span id="newProduct" style="cursor:pointer;" onclick="clearAll()" title="Click here to clear all fileds">
+	🆕 </span> Add A Product</h1> </center>       
         <form id="itemForm">
-      <!--      <div class="form-group">
-                <label for="itemId">Item ID:</label>
-                <input type="text" id="itemId" required placeholder="e.g., 1">
-            </div>
-     -->
             <div class="form-group">
                 <label for="name">Product Name:</label>
                 <input type="text" id="name" required placeholder="e.g., Apple AirPods Pro (2nd Generation)">
@@ -359,6 +393,7 @@
         getDocs,
         doc,
         setDoc,
+        getDoc,
         Timestamp
     } from 'https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js';
 
@@ -376,6 +411,38 @@
     const db = getFirestore(app);
 
     let tags = [];
+
+    // Fetch shop name from meta collection
+    async function loadShopName() {
+        try {
+            const metaDoc = doc(db, 'meta', 'metadata'); // Assuming document ID is 'shopInfo'
+            const docSnap = await getDoc(metaDoc);
+            
+            const shopHeading = document.getElementById('shopHeading');
+            
+            if (docSnap.exists()) {
+                const data = docSnap.data();
+                if (data.shopName) {
+                    shopHeading.textContent = `🌿 ${data.shopName} - ${data.place}`;
+                    shopHeading.classList.remove('loading');
+                } else {
+                    shopHeading.textContent = '🌿';
+                    shopHeading.classList.remove('loading');
+                }
+            } else {
+                shopHeading.textContent = '🌿';
+                shopHeading.classList.remove('loading');
+            }
+        } catch (error) {
+            console.error('Error fetching shop name:', error);
+            const shopHeading = document.getElementById('shopHeading');
+            shopHeading.textContent = '🌿 Add a Product';
+            shopHeading.classList.remove('loading');
+        }
+    }
+
+    // Load shop name on page load
+    loadShopName();
 
     const tagInput = document.getElementById('tagInput');
     const tagsContainer = document.getElementById('tagsContainer');
@@ -499,6 +566,23 @@
     }
 
     populateExampleData();
+
+ // Clear All fields data
+    function clearAll() {
+        document.getElementById('name').value = '';
+        document.getElementById('category').value = '';
+        document.getElementById('brand').value = '';
+        document.getElementById('description').value = '';
+        document.getElementById('price').value = '';
+        document.getElementById('originalPrice').value = '';
+        document.getElementById('imageUrl').value = '';
+        document.getElementById('rating').value = '';
+        document.getElementById('reviewCount').value = '';
+        document.getElementById('badge').value = '';
+        document.getElementById('deliveryDate').value = '';
+        tags = [''];
+        renderTags();
+    }
 </script>
 
 </body>
