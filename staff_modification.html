@@ -1,0 +1,757 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Staff Account Details</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+            transform: scale(0.9);
+            transform-origin: top center;
+        }
+
+        .container {
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(10px);
+            border-radius: 20px;
+            padding: 40px;
+            width: 100%;
+            max-width: 700px;
+            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.1);
+            animation: slideUp 0.6s ease-out;
+        }
+
+        @keyframes slideUp {
+            from {
+                opacity: 0;
+                transform: translateY(30px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        .header {
+            text-align: center;
+            margin-bottom: 30px;
+        }
+
+        .header h1 {
+            color: #333;
+            font-size: 2.5em;
+            margin-bottom: 10px;
+            background: linear-gradient(45deg, #667eea, #764ba2);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+        .header h2 {
+            color: #333;
+            font-size: 1.5em;
+            margin-bottom: 10px;
+            background: linear-gradient(45deg, #667eea, #764ba2);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        .header p {
+            color: #666;
+            font-size: 1.1em;
+        }
+
+        .search-section {
+            background: rgba(255, 255, 255, 0.7);
+            border-radius: 15px;
+            padding: 25px;
+            margin-bottom: 30px;
+            border: 2px solid rgba(102, 126, 234, 0.1);
+        }
+
+        .search-section h3 {
+            color: #333;
+            margin-bottom: 15px;
+            font-size: 1.3em;
+        }
+
+        .search-controls {
+            display: flex;
+            gap: 15px;
+            margin-bottom: 20px;
+            flex-wrap: wrap;
+        }
+
+        .search-input {
+            flex: 1;
+            min-width: 200px;
+        }
+
+        .search-btn {
+            background: linear-gradient(45deg, #667eea, #764ba2);
+            color: white;
+            border: none;
+            padding: 15px 30px;
+            border-radius: 10px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            white-space: nowrap;
+        }
+
+        .search-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(102, 126, 234, 0.3);
+        }
+
+        .clear-btn {
+            background: linear-gradient(45deg, #6c757d, #495057);
+            color: white;
+            border: none;
+            padding: 15px 20px;
+            border-radius: 10px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+
+        .clear-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(108, 117, 125, 0.3);
+        }
+
+        .search-results {
+            display: none;
+            margin-top: 20px;
+        }
+
+        .search-results h4 {
+            color: #333;
+            margin-bottom: 15px;
+        }
+
+        .user-list {
+            max-height: 200px;
+            overflow-y: auto;
+            border: 1px solid #ddd;
+            border-radius: 8px;
+        }
+
+        .user-item {
+            padding: 12px 15px;
+            border-bottom: 1px solid #eee;
+            cursor: pointer;
+            transition: background-color 0.2s;
+        }
+
+        .user-item:hover {
+            background-color: rgba(102, 126, 234, 0.1);
+        }
+
+        .user-item:last-child {
+            border-bottom: none;
+        }
+
+        .user-item strong {
+            color: #667eea;
+        }
+
+        .form-section {
+            margin-top: 30px;
+        }
+
+        .mode-indicator {
+            background: linear-gradient(45deg, #28a745, #20c997);
+            color: white;
+            padding: 10px 20px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+            text-align: center;
+            font-weight: 600;
+            display: none;
+        }
+
+        .mode-indicator.edit-mode {
+            background: linear-gradient(45deg, #ffc107, #fd7e14);
+            display: block;
+        }
+
+        .form-group {
+            margin-bottom: 25px;
+            position: relative;
+        }
+
+        .form-row {
+            display: flex;
+            gap: 15px;
+        }
+
+        .form-row .form-group {
+            flex: 1;
+        }
+
+        label {
+            display: block;
+            margin-bottom: 8px;
+            color: #333;
+            font-weight: 600;
+            font-size: 0.95em;
+        }
+
+        input, select, textarea {
+            width: 100%;
+            padding: 15px;
+            border: 2px solid #e1e5e9;
+            border-radius: 10px;
+            font-size: 1em;
+            transition: all 0.3s ease;
+            background: rgba(255, 255, 255, 0.8);
+        }
+
+        input:focus, select:focus, textarea:focus {
+            outline: none;
+            border-color: #667eea;
+            box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+            transform: translateY(-2px);
+        }
+
+        textarea {
+            resize: vertical;
+            min-height: 100px;
+        }
+
+        .submit-btn {
+            width: 100%;
+            padding: 18px;
+            background: linear-gradient(45deg, #667eea, #764ba2);
+            color: white;
+            border: none;
+            border-radius: 12px;
+            font-size: 1.1em;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            margin-top: 20px;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .submit-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 25px rgba(102, 126, 234, 0.3);
+        }
+
+        .submit-btn:active {
+            transform: translateY(0);
+        }
+
+        .submit-btn:disabled {
+            opacity: 0.7;
+            cursor: not-allowed;
+        }
+
+        .loading {
+            display: none;
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+        }
+
+        .loading::after {
+            content: '';
+            width: 20px;
+            height: 20px;
+            border: 2px solid rgba(255, 255, 255, 0.3);
+            border-top: 2px solid white;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        .success-message {
+            background: linear-gradient(45deg, #56ab2f, #a8e6cf);
+            color: white;
+            padding: 15px;
+            border-radius: 10px;
+            margin-bottom: 20px;
+            display: none;
+            animation: fadeIn 0.5s ease-out;
+        }
+
+        .error-message {
+            background: linear-gradient(45deg, #ff6b6b, #ee5a52);
+            color: white;
+            padding: 15px;
+            border-radius: 10px;
+            margin-bottom: 20px;
+            display: none;
+            animation: fadeIn 0.5s ease-out;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(-10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        .required {
+            color: #e74c3c;
+        }
+
+        @media (max-width: 768px) {
+            .container {
+                padding: 20px;
+                margin: 10px;
+            }
+
+            .form-row, .search-controls {
+                flex-direction: column;
+                gap: 0;
+            }
+
+            .header h1 {
+                font-size: 2em;
+            }
+
+            .search-input {
+                min-width: 100%;
+            }
+        }
+
+        #passwordText, #password {
+            color: green;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h2 id="shopHeading" class="loading">🌿 Loading...</h2>
+            <h1>Staff Account</h1>
+            <p>Search existing users or create new accounts</p>
+        </div>
+
+        <!-- Search Section -->
+        <div class="search-section">
+            <h3>🔍 Search Staff</h3>
+            <div class="search-controls">
+                <input type="text" id="searchInput" class="search-input" placeholder="Enter Staff ID or Name" aria-label="Search by staff ID or name">
+                <button type="button" id="searchBtn" class="search-btn">Search</button>
+                <button type="button" id="clearBtn" class="clear-btn">Clear</button>
+            </div>
+            
+            <div class="search-results" id="searchResults">
+                <h4>Search Results:</h4>
+                <div class="user-list" id="userList"></div>
+            </div>
+        </div>
+
+        <!-- Messages -->
+        <div class="success-message" id="successMessage">
+            Staff updated successfully!
+        </div>
+
+        <div class="error-message" id="errorMessage">
+            An error occurred. Please try again.
+        </div>
+
+        <!-- Form Section -->
+        <div class="form-section">
+            <div class="mode-indicator" id="modeIndicator">
+                📝 Edit Mode: You are editing an existing staff member
+            </div>
+
+            <form id="userForm">
+                <input type="hidden" id="userId" name="userId">
+                <input type="hidden" id="editMode" name="editMode" value="false">
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="phone">Phone Number <span class="required">*</span></label>
+                        <input type="tel" id="phone" name="phone" required placeholder="e.g., +91 98765 43210" aria-required="true">
+                    </div>
+                    <div class="form-group">
+                        <label for="email">Email Address (Optional)</label>
+                        <input type="email" id="email" name="email" placeholder="e.g., your.email@example.com">
+                    </div>
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="name">Full Name</label>
+                        <input type="text" id="name" name="name" placeholder="e.g., John Doe">
+                    </div>
+                    <div class="form-group">
+                        <label for="role">Role</label>
+                        <input type="text" id="role" name="role" placeholder="e.g., Manager">
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label for="address">Present Address <span class="required">*</span></label>
+                    <textarea id="address" name="address" required placeholder="e.g., House/Flat No., Building Name, Street Name, Area, PO, District, PIN" rows="3" aria-required="true"></textarea>
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="dateOfBirth">Date of Birth</label>
+                        <input type="date" id="dateOfBirth" name="dateOfBirth">
+                    </div>
+                    <div class="form-group">
+                        <label for="gender">Gender</label>
+                        <select id="gender" name="gender">
+                            <option value="">Select Gender</option>
+                            <option value="male">Male</option>
+                            <option value="female">Female</option>
+                            <option value="other">Other</option>
+                            <option value="prefer-not-to-say">Prefer not to say</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="alternatePhone">Alternate Phone</label>
+                        <input type="tel" id="alternatePhone" name="alternatePhone" placeholder="e.g., +91 98765 43210">
+                    </div>
+                    <div class="form-group">
+                        <label for="password">Password <span class="required">*</span></label>
+                        <input type="password" id="password" name="password" required placeholder="Enter a secure password" aria-required="true">
+                    </div>
+                </div>
+                <button type="submit" class="submit-btn" id="submitBtn">
+                    <span id="btnText">Create Account</span>
+                    <div class="loading" id="loading"></div>
+                </button>
+            </form>
+        </div>
+    </div>
+
+    <script type="module">
+        import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js';
+        import {
+            getFirestore,
+            collection,
+            query,
+            orderBy,
+            limit,
+            getDocs,
+            doc,
+            setDoc,
+            getDoc,
+            updateDoc,
+            where,
+            Timestamp
+        } from 'https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js';
+
+        // Firebase configuration (consider securing this in production)
+        const firebaseConfig = {
+            apiKey: "AIzaSyC3Euw4CyPnMtHnyClV1tVmkNtfIFTXc9I",
+            authDomain: "sunilvox-1.firebaseapp.com",
+            projectId: "sunilvox-1",
+            storageBucket: "sunilvox-1.firebasestorage.app",
+            messagingSenderId: "1046912567084",
+            appId: "1:1046912567084:web:8a36a701601bfee59fce89",
+            measurementId: "G-C1GVJ38N09"
+        };
+
+        // Initialize Firebase
+        const app = initializeApp(firebaseConfig);
+        const db = getFirestore(app);
+
+        let isEditMode = false;
+        let currentUserId = null;
+
+        // Fetch shop name from meta collection
+        async function loadShopName() {
+            try {
+                const metaDoc = doc(db, 'meta', 'metadata');
+                const docSnap = await getDoc(metaDoc);
+                const shopHeading = document.getElementById('shopHeading');
+                
+                if (docSnap.exists()) {
+                    const data = docSnap.data();
+                    shopHeading.textContent = data.shopName ? `🌿 ${data.shopName} - ${data.place}` : '🌿 Staff Management';
+                } else {
+                    shopHeading.textContent = '🌿 Staff Management';
+                }
+            } catch (error) {
+                console.error('Error fetching shop name:', error);
+                document.getElementById('shopHeading').textContent = '🌿 Staff Management';
+            } finally {
+                document.getElementById('shopHeading').classList.remove('loading');
+            }
+        }
+
+        // Validate phone number format
+        function validatePhone(phone) {
+            const phoneRegex = /^\+?\d{10,15}$/;
+            return phoneRegex.test(phone);
+        }
+
+        // Search users
+        async function searchUsers(searchTerm) {
+            const userList = document.getElementById('userList');
+            const searchResults = document.getElementById('searchResults');
+            const errorMessage = document.getElementById('errorMessage');
+
+            try {
+                userList.innerHTML = '<div style="padding: 20px; text-align: center;">Searching...</div>';
+                searchResults.style.display = 'block';
+
+                const users = [];
+                
+                // Search by ID (exact match)
+                if (searchTerm.trim()) {
+                    const idQuery = query(
+                        collection(db, 'users'), 
+                        where('id', '==', searchTerm.trim())
+                    );
+                    const idSnapshot = await getDocs(idQuery);
+                    idSnapshot.forEach(doc => {
+                        users.push({ id: doc.id, ...doc.data() });
+                    });
+                }
+
+                // If no ID match, search by name
+                if (users.length === 0 && searchTerm.trim()) {
+                    const allUsersQuery = query(collection(db, 'users'));
+                    const allSnapshot = await getDocs(allUsersQuery);
+                    
+                    allSnapshot.forEach(doc => {
+                        const data = doc.data();
+                        const name = (data.name || '').toLowerCase();
+                        if (name.includes(searchTerm.toLowerCase())) {
+                            users.push({ id: doc.id, ...data });
+                        }
+                    });
+                }
+
+                // Display results
+                if (users.length === 0) {
+                    userList.innerHTML = '<div style="padding: 20px; text-align: center; color: #666;">No staff found</div>';
+                } else {
+                    userList.innerHTML = users.map(user => `
+                        <div class="user-item" data-user-id="${user.id}">
+                            <strong>ID: ${user.id}</strong><br>
+                            <span>${user.name || 'No name'}</span><br>
+                            <small style="color: #666;">${user.phone}</small>
+                        </div>
+                    `).join('');
+                }
+
+            } catch (error) {
+                console.error('Error searching users:', error);
+                userList.innerHTML = '<div style="padding: 20px; text-align: center; color: #e74c3c;">Error searching staff</div>';
+                errorMessage.textContent = 'Error searching staff: ' + error.message;
+                errorMessage.style.display = 'block';
+            }
+        }
+
+        // Populate form with user data
+        function populateForm(data) {
+            document.getElementById('phone').value = data.phone || '';
+            document.getElementById('email').value = data.email || '';
+            document.getElementById('name').value = data.name || '';
+            document.getElementById('address').value = data.address || '';
+            document.getElementById('dateOfBirth').value = data.dateOfBirth || '';
+            document.getElementById('gender').value = data.gender || '';
+            document.getElementById('role').value = data.role || '';
+            document.getElementById('alternatePhone').value = data.alternatePhone || '';
+            document.getElementById('password').value = ''; // Do not populate password for security
+        }
+
+        // Set edit mode
+        function setEditMode(editMode, userId = null) {
+            isEditMode = editMode;
+            currentUserId = userId;
+            
+            const modeIndicator = document.getElementById('modeIndicator');
+            const btnText = document.getElementById('btnText');
+            const editModeInput = document.getElementById('editMode');
+            const userIdInput = document.getElementById('userId');
+            const passwordInput = document.getElementById('password');
+
+            if (editMode) {
+                modeIndicator.classList.add('edit-mode');
+                btnText.textContent = 'Update Staff';
+                editModeInput.value = 'true';
+                userIdInput.value = userId;
+                passwordInput.removeAttribute('required'); // Password optional in edit mode
+            } else {
+                modeIndicator.classList.remove('edit-mode');
+                btnText.textContent = 'Create Account';
+                editModeInput.value = 'false';
+                userIdInput.value = '';
+                passwordInput.setAttribute('required', 'true');
+            }
+        }
+
+        // Clear form and search
+        function clearAll() {
+            document.getElementById('userForm').reset();
+            document.getElementById('searchInput').value = '';
+            document.getElementById('searchResults').style.display = 'none';
+            document.getElementById('successMessage').style.display = 'none';
+            document.getElementById('errorMessage').style.display = 'none';
+            setEditMode(false);
+        }
+
+        // Event delegation for user selection
+        document.getElementById('userList').addEventListener('click', async (e) => {
+            const userItem = e.target.closest('.user-item');
+            if (userItem) {
+                const userId = userItem.dataset.userId;
+                try {
+                    const docRef = doc(db, 'users', userId);
+                    const docSnap = await getDoc(docRef);
+
+                    if (docSnap.exists()) {
+                        const data = docSnap.data();
+                        populateForm(data);
+                        setEditMode(true, userId);
+                        document.getElementById('searchResults').style.display = 'none';
+                        document.getElementById('searchInput').value = '';
+                        document.querySelector('.form-section').scrollIntoView({ behavior: 'smooth' });
+                    } else {
+                        console.error('Staff not found');
+                    }
+                } catch (error) {
+                    console.error('Error fetching staff:', error);
+                    const errorMessage = document.getElementById('errorMessage');
+                    errorMessage.textContent = 'Error loading staff: ' + error.message;
+                    errorMessage.style.display = 'block';
+                }
+            }
+        });
+
+        // Load shop name on page load
+        loadShopName();
+
+        // Search functionality
+        document.getElementById('searchBtn').addEventListener('click', () => {
+            const searchTerm = document.getElementById('searchInput').value.trim();
+            if (searchTerm) {
+                searchUsers(searchTerm);
+            }
+        });
+
+        document.getElementById('searchInput').addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') {
+                const searchTerm = e.target.value.trim();
+                if (searchTerm) {
+                    searchUsers(searchTerm);
+                }
+            }
+        });
+
+        document.getElementById('clearBtn').addEventListener('click', clearAll);
+
+        // Form submission handler
+        document.getElementById('userForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            
+            const submitBtn = document.getElementById('submitBtn');
+            const btnText = document.getElementById('btnText');
+            const loading = document.getElementById('loading');
+            const successMessage = document.getElementById('successMessage');
+            const errorMessage = document.getElementById('errorMessage');
+            const formData = new FormData(e.target);
+            const phone = formData.get('phone');
+            const alternatePhone = formData.get('alternatePhone');
+            const password = formData.get('password');
+
+            // Validate phone numbers
+            if (!validatePhone(phone) || (alternatePhone && !validatePhone(alternatePhone))) {
+                errorMessage.textContent = 'Please enter valid phone number(s) (10-15 digits).';
+                errorMessage.style.display = 'block';
+                errorMessage.scrollIntoView({ behavior: 'smooth' });
+                return;
+            }
+
+            // Show loading state
+            submitBtn.disabled = true;
+            btnText.style.opacity = '0';
+            loading.style.display = 'block';
+
+            // Hide previous messages
+            successMessage.style.display = 'none';
+            errorMessage.style.display = 'none';
+
+            try {
+                const userData = {
+                    phone: phone,
+                    email: formData.get('email') || null,
+                    name: formData.get('name') || null,
+                    address: formData.get('address') || null,
+                    dateOfBirth: formData.get('dateOfBirth') || null,
+                    gender: formData.get('gender') || null,
+                    role: formData.get('role') || null,
+                    alternatePhone: alternatePhone || null,
+                    password: password || null, // Note: Should be hashed in production
+                    accountStatus: 'active',
+                    emailVerified: false,
+                    phoneVerified: false,
+                    updatedAt: Timestamp.now()
+                };
+
+                if (isEditMode && currentUserId) {
+                    // Update existing user
+                    const docRef = doc(db, 'users', currentUserId);
+                    // Only update password if provided
+                    if (!password) {
+                        delete userData.password;
+                    }
+                    await updateDoc(docRef, userData);
+                    successMessage.textContent = 'Staff updated successfully!';
+                    successMessage.style.display = 'block';
+                } else {
+                    // Create new user
+                    const q = query(collection(db, 'users'), orderBy('id', 'desc'), limit(1));
+                    const snapshot = await getDocs(q);
+
+                    let newId = 1;
+                    if (!snapshot.empty) {
+                        const lastItem = snapshot.docs[0].data();
+                        newId = parseInt(lastItem.id) + 1;
+                    }
+
+                    const newIdStr = newId.toString();
+                    userData.id = newIdStr;
+                    userData.createdAt = Timestamp.now();
+
+                    const docRef = doc(db, 'users', newIdStr);
+                    await setDoc(docRef, userData);
+
+                    successMessage.textContent = 'Account created successfully!';
+                    successMessage.style.display = 'block';
+                    e.target.reset();
+                    setEditMode(false);
+                }
+
+                successMessage.scrollIntoView({ behavior: 'smooth' });
+
+            } catch (error) {
+                console.error('Error saving staff: ', error);
+                errorMessage.style.display = 'block';
+                errorMessage.textContent = 'Error: ' + error.message;
+                errorMessage.scrollIntoView({ behavior: 'smooth' });
+            } finally {
+                submitBtn.disabled = false;
+                btnText.style.opacity = '1';
+                loading.style.display = 'none';
+            }
+        });
+    </script>
+</body>
+</html>
