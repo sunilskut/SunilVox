@@ -6,23 +6,263 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>OSIS Admin Panel</title>
   <script src="https://cdn.tailwindcss.com"></script>
+<link href="https://cdn.jsdelivr.net/npm/tailwindcss@3.4.1/dist/tailwind.min.css" rel="stylesheet">
+
 </head>
+
+<script type="module" defer>
+       	import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js';
+	import {
+  		getFirestore,
+  		collection,
+  		doc,
+  		getDocs,
+  		getDoc,          
+  		query,
+		addDoc,
+		runTransaction,
+  	where
+	} from 'https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js';
+
+        const firebaseConfig = {
+            apiKey: "AIzaSyC3Euw4CyPnMtHnyClV1tVmkNtfIFTXc9I",
+            authDomain: "sunilvox-1.firebaseapp.com",
+            projectId: "sunilvox-1",
+            storageBucket: "sunilvox-1.firebasestorage.app",
+            messagingSenderId: "1046912567084",
+            appId: "1:1046912567084:web:8a36a701601bfee59fce89",
+            measurementId: "G-C1GVJ38N09"
+        };
+
+        const app = initializeApp(firebaseConfig);
+        const db = getFirestore(app);
+	window.db = db; //new
+
+ // Utility to format Firestore timestamp or ISO date string to dd-mm-yyyy
+  function formatDate(input) {
+    const date = input instanceof Date ? input : new Date(input);
+    return `${String(date.getDate()).padStart(2, '0')}-${String(date.getMonth()+1).padStart(2, '0')}-${date.getFullYear()}`;
+  }
+
+document.addEventListener('DOMContentLoaded', function () {
+
+    // Get role from URL parameters
+    const urlParams = new URLSearchParams(window.location.search);
+    const roleFromUrl = urlParams.get('role');
+
+    // Get role from session storage
+    const roleFromSession = sessionStorage.getItem('userRole');
+
+    // Compare and act
+    if (roleFromUrl && roleFromUrl === roleFromSession) {
+        switch (roleFromUrl) {
+            case 'admin':
+                alert('Welcome Admin!');
+		document.getElementById('products').style.display = 'block';
+		document.getElementById('orders').style.display = 'block';
+		document.getElementById('customers').style.display = 'block';
+		document.getElementById('staffs').style.display = 'block';
+		document.getElementById('reports').style.display = 'block';
+		document.getElementById('settings').style.display = 'block';
+                break;
+            case 'packingStaff':
+  		document.getElementById('orderDashboard').style.display = 'block';
+                document.getElementById('orders').style.display = 'block';
+                break;
+            case 'productsStaff':
+		document.getElementById('products').style.display = 'block';
+                break;
+            case 'manager':
+                // Do something for manager
+                console.log('Manager Dashboard Ready');
+                break;
+            case 'supervisor':
+                // Do something for supervisor
+                console.log('Supervisor Access Granted');
+                break;
+            default:
+                console.log('Unknown role');
+        }
+    } else {
+        // Mismatch or missing role
+        console.warn('Invalid or mismatched role. Redirecting...');
+        window.location.href = 'login.html'; // Or any fallback page
+    }
+});
+
+
+async function fetchOrders() {
+  const ordersSnapshot = await getDocs(collection(db, 'orders'));
+  const pendingBody = document.getElementById('ordersTableBody');
+  const packedBody = document.getElementById('packedOrdersTableBody');
+
+  for (const docSnap of ordersSnapshot.docs) {
+    const order = docSnap.data();
+    const orderId = docSnap.id;
+    const createdAt = order.createdAt;
+    const dateFormatted = formatDate(createdAt);
+    const status = order.status?.toLowerCase();
+
+    // Items array
+    const items = order.items || [];
+    const itemHtmlArray = [];
+
+    for (let index = 0; index < items.length; index++) {
+      const item = items[index];
+      const productId = item.productId;
+      const tooltipId = `tooltip-${orderId}-${productId}-${index}`;
+
+      let tooltipHTML = `
+        <div class="relative inline-block">
+          <span 
+            class="underline text-blue-600 cursor-pointer" 
+            onmouseover="document.getElementById('${tooltipId}').classList.remove('hidden')" 
+            onmouseout="document.getElementById('${tooltipId}').classList.add('hidden')"
+          >
+            ${productId}
+          </span>
+          <div 
+            id="${tooltipId}" 
+            class="absolute z-50 hidden bg-white border border-gray-300 p-2 rounded shadow-lg w-48 top-full mt-1 left-1/2 -translate-x-1/2"
+          >
+            <div class="text-sm text-gray-500">Product not found</div>
+          </div>
+        </div>
+      `;
+
+      try {
+        const productRef = doc(db, 'products', productId);
+        const productSnap = await getDoc(productRef);
+
+        if (productSnap.exists()) {
+          const product = productSnap.data();
+          const productName = product.name || '';
+          const imageUrl = product.imageUrl || '';
+
+          tooltipHTML = `
+            <div class="relative inline-block">
+              <span 
+                class="underline text-blue-600 cursor-pointer" 
+                onmouseover="document.getElementById('${tooltipId}').classList.remove('hidden')" 
+                onmouseout="document.getElementById('${tooltipId}').classList.add('hidden')"
+              >
+                ${productId}
+              </span>
+              <div 
+                id="${tooltipId}" 
+                class="absolute z-50 hidden bg-white border border-gray-300 p-2 rounded shadow-lg w-60 top-full mt-1 left-1/2 -translate-x-1/2"
+              >
+                <div class="flex items-center gap-2">
+                  <img src="${imageUrl}" alt="${productName}" class="w-12 h-12 object-cover rounded" />
+                  <div class="text-sm text-gray-800">${productName}</div>
+                </div>
+              </div>
+            </div>
+          `;
+        }
+      } catch (error) {
+        console.error(`Error fetching product ${productId}:`, error);
+      }
+
+      itemHtmlArray.push(tooltipHTML);
+    }
+
+    const shipping = order.shippingDetails?.address || 'Tvm';
+
+    // Build row HTML
+    const row = document.createElement('tr');
+    row.className = 'border-t';
+    row.innerHTML = `
+      <td class="p-2">${orderId}</td>
+      <td class="p-2">${dateFormatted}</td>
+      <td class="p-2 overflow-visible relative space-x-1">${itemHtmlArray.join(', ')}</td>
+      <td class="p-2">${shipping}</td>
+      <td class="p-2">
+        ${status === 'pending' 
+          ? `<button class="text-green-600" onclick="window.location.href='PackingOrder.html?orderId=${orderId}'">Pack Now</button>` 
+          : `<span class="text-gray-500">Packed</span>`}
+      </td>
+    `;
+
+    // Append to appropriate table
+    if (status === 'pending') {
+      pendingBody.appendChild(row);
+    } else if (status === 'packed') {
+      packedBody.appendChild(row);
+    }
+  }
+}
+
+document.addEventListener('DOMContentLoaded', fetchOrders);
+
+
+
+document.addEventListener('DOMContentLoaded', function () {
+    const monthNames = [
+      "January", "February", "March", "April", "May", "June",
+      "July", "August", "September", "October", "November", "December"
+    ];
+    const today = new Date();
+    document.getElementById("Month").textContent = monthNames[today.getMonth()];
+    document.getElementById("Year").textContent = today.getFullYear();
+  });
+
+
+
+
+async function loadShopName() {
+        try {
+            const metaDoc = doc(db, 'meta', 'metadata'); // Assuming document ID is 'shopInfo'
+            const docSnap = await getDoc(metaDoc);
+            
+            const shopHeading = document.getElementById('shopHeading');
+            
+            if (docSnap.exists()) {
+                const data = docSnap.data();
+                if (data.shopName) {
+                    shopHeading.textContent = `🌿 ${data.shopName} - ${data.place}`;
+                    shopHeading.classList.remove('loading');
+                } else {
+                    shopHeading.textContent = '🌿';
+                    shopHeading.classList.remove('loading');
+                }
+            } else {
+                shopHeading.textContent = '🌿';
+                shopHeading.classList.remove('loading');
+            }
+        } catch (error) {
+            console.error('Error fetching shop name:', error);
+            const shopHeading = document.getElementById('shopHeading');
+            shopHeading.textContent = '🌿 Add a Product';
+            shopHeading.classList.remove('loading');
+        }
+    }
+    // Load shop name on page load
+    loadShopName();
+</script>
 
 <body class="bg-gray-100 font-sans h-screen overflow-y-auto">
   <div class="flex flex-col md:flex-row h-full">
     <!-- Sidebar -->
     <aside id="sidebar" class="w-64 bg-white shadow-md md:block hidden fixed md:relative z-30 h-full">
-      <div class="p-4 text-xl font-bold text-blue-600 flex justify-between items-center">
-        OSIS Admin
+      <div class="p-4 text-lg font-bold text-blue-400 flex justify-between items-center">
+        <span id='shopHeading'></span>
         <button class="md:hidden text-gray-600" onclick="toggleSidebar()">✖</button>
       </div>
-      <nav class="mt-6 space-y-2">
-        <a href="#dashboard" class="block px-4 py-2 hover:bg-blue-100">Dashboard</a>
-        <a href="#products" class="block px-4 py-2 hover:bg-blue-100">Product Management</a>
+      <nav class="mt-6 space-y-2" style="display:none;">
+        <a href="#Dashboard" class="block px-4 py-2 hover:bg-blue-100" >Dashboard</a>
+        <a href="#products" class="block px-4 py-2 hover:bg-blue-100" style="display:none;">Product Management</a>
         <a href="#orders" class="block px-4 py-2 hover:bg-blue-100">Order Management</a>
-        <a href="#customers" class="block px-4 py-2 hover:bg-blue-100">Customer Management</a>
-        <a href="#reports" class="block px-4 py-2 hover:bg-blue-100">Reports</a>
-        <a href="#settings" class="block px-4 py-2 hover:bg-blue-100">Settings</a>
+        <a href="#customers" class="block px-4 py-2 hover:bg-blue-100" style="display:none;">Customer Management</a>
+        <a href="#reports" class="block px-4 py-2 hover:bg-blue-100" style="display:none;">Reports</a>
+        <a href="#settings" class="block px-4 py-2 hover:bg-blue-100" style="display:none;">Settings</a>
+	<a href="loginPage.html" class="block px-4 py-2 hover:bg-blue-100">Logout</a>
+      </nav>
+
+<nav class="mt-6 space-y-2" ">
+        <a href="#orderDashboard" class="block px-4 py-2 hover:bg-blue-100" >Order Dashboard</a>
+        <a href="#orders" class="block px-4 py-2 hover:bg-blue-100">Order Management</a>
+	<a href="loginPage.html" class="block px-4 py-2 hover:bg-blue-100">Logout</a>
       </nav>
     </aside>
 
@@ -35,9 +275,10 @@
     <!-- Main Content -->
     <div class="flex-1 flex flex-col overflow-hidden">
       <main class="flex-1 overflow-y-auto p-4 space-y-10">
-        <!-- Dashboard -->
-        <section id="dashboard">
-          <h2 class="text-2xl font-semibold mb-4">Dashboard</h2>
+       
+	<!-- Admin Dashboard -->
+        <section id="adminDashboard" style="display:none;">
+          <h2 class="text-2xl font-semibold mb-4">Admin Dashboard</h2>
           <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
             <div class="p-4 bg-white rounded shadow">Orders: <strong>120</strong></div>
             <div class="p-4 bg-white rounded shadow">Customers: <strong>300</strong></div>
@@ -47,7 +288,7 @@
         </section>
 
         <!-- Product Management -->
-        <section id="products">
+        <section id="products" style="display:none;">
           <h2 class="text-2xl font-semibold mb-4">Product Management</h2>
           <div class="bg-white p-4 rounded shadow">
 <div>
@@ -82,37 +323,92 @@
           </div>
         </section>
 
-        <!-- Order Management -->
-        <section id="orders">
-          <h2 class="text-2xl font-semibold mb-4">Order Management</h2>
-          <div class="bg-white p-4 rounded shadow">
-            <table class="w-full text-sm">
-              <thead>
-                <tr class="bg-gray-200 text-left">
-                  <th class="p-2">Order ID</th>
-                  <th class="p-2">Customer</th>
-                  <th class="p-2">Status</th>
-                  <th class="p-2">Shipping</th>
-                  <th class="p-2">Actions</th>
-                </tr>
-              </thead>
-              <tbody>
-                <tr class="border-t">
-                  <td class="p-2">#001</td>
-                  <td class="p-2">John Doe</td>
-                  <td class="p-2">Pending</td>
-                  <td class="p-2">UPS</td>
-                  <td class="p-2 space-x-2">
-                    <button class="text-green-600">Update</button>
-                  </td>
-                </tr>
-              </tbody>
-            </table>
-          </div>
+<!-- Order Management -->
+<!-- Odrer Dashboard -->
+        <section id="orderDashboard" style="display:none;">
+          <h2 class="text-2xl font-semibold mb-4">Order Dashboard</h2>
+          <div class="grid grid-cols-1 md:grid-cols-4 gap-4 items-start">
+  <div class="flex items-center justify-between p-3 bg-white rounded shadow h-16">
+    <span class="text-sm text-gray-700">Packed Pending Orders:</span>
+    <strong class="text-base text-gray-900">120</strong>
+  </div>
+
+  <div class="flex items-center justify-between p-3 bg-white rounded shadow h-16">
+    <span class="text-sm text-gray-700">Packed Orders Today:</span>
+    <strong class="text-base text-gray-900">300</strong>
+  </div>
+
+  <div class="flex items-center justify-between p-3 bg-white rounded shadow h-16">
+    <span class="text-sm text-gray-700">
+      Packed in <span id="Month" class="text-green-600 font-semibold"></span>:
+    </span>
+    <strong class="text-base text-gray-900">5,000</strong>
+  </div>
+
+  <div class="flex items-center justify-between p-3 bg-white rounded shadow h-16">
+    <span class="text-sm text-gray-700">
+      Packed in <span id="Year" class="text-blue-600 font-semibold"></span>:
+    </span>
+    <strong class="text-base text-gray-900">12,200</strong>
+  </div>
+</div>
+
         </section>
 
+<section id="orders" style="display:none;">
+  <h2 class="text-2xl font-semibold mb-4">Order Management</h2>
+
+  <!-- Packing Pending Orders -->
+  <div class="bg-white p-4 rounded shadow mb-6">
+    <h2 class="text-xl font-semibold mb-4 text-center">Packing Pending Orders</h2>
+    <table class="w-full text-sm" id="ordersTable">
+      <thead>
+        <tr class="bg-gray-200 text-left">
+          <th class="p-2">Order ID</th>
+          <th class="p-2">Date</th>
+          <th class="p-2">Items</th>
+          <th class="p-2">Shipping</th>
+          <th class="p-2">Actions</th>
+        </tr>
+      </thead>
+      <tbody id="ordersTableBody">
+        <tr class="border-t"></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <!-- Packed Orders -->
+  <div class="bg-white p-4 rounded shadow mb-6">
+    <h2 class="text-xl font-semibold mb-4 text-center">Packed Orders</h2>
+    <table class="w-full text-sm" id="packedOrdersTable">
+      <thead>
+        <tr class="bg-gray-200 text-left">
+          <th class="p-2">Order ID</th>
+          <th class="p-2">Date</th>
+          <th class="p-2">Items</th>
+          <th class="p-2">Shipping</th>
+          <th class="p-2">Actions</th>
+        </tr>
+      </thead>
+      <tbody id="packedOrdersTableBody">
+        <tr class="border-t"></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <!-- Packing List Button -->
+  <div class="text-center">
+    <button class="my-4 bg-blue-500 text-white px-4 py-2 rounded" onclick="location.href='PackingList.html'">
+      Packing List
+    </button>
+  </div>
+</section>
+
+
+
+
         <!-- Customer Management -->
-        <section id="customers">
+        <section id="customers" style="display:none;">
           <h2 class="text-2xl font-semibold mb-4">Customer Management</h2>
           <div class="bg-white p-4 rounded shadow">
 <button class="mb-4 bg-blue-500 text-white px-4 py-2 rounded" onclick="location.href='customer_modification.html'">Account Settings</button>
@@ -135,8 +431,32 @@
           </div>
         </section>
 
+ <!-- Staff Management -->
+        <section id="staffs" style="display:none;">
+          <h2 class="text-2xl font-semibold mb-4">Staff Management</h2>
+          <div class="bg-white p-4 rounded shadow">
+<button class="mb-4 bg-blue-500 text-white px-4 py-2 rounded" onclick="location.href='customer_modification.html'">Staff Settings</button>
+            <table class="w-full text-sm">
+              <thead>
+                <tr class="bg-gray-200 text-left">
+                  <th class="p-2">Name</th>
+                  <th class="p-2">Email</th>
+                  <th class="p-2">Phone</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr class="border-t">
+                  <td class="p-2">Jane Smith</td>
+                  <td class="p-2">jane@example.com</td>
+                  <td class="p-2">+91-9876543210</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </section>
+
         <!-- Reports -->
-        <section id="reports">
+        <section id="reports" style="display:none;">
           <h2 class="text-2xl font-semibold mb-4">Reports</h2>
           <div class="bg-white p-4 rounded shadow space-y-4">
             <p>Sales Report: <strong>View sales data for past months</strong></p>
@@ -146,7 +466,7 @@
         </section>
 
         <!-- Settings -->
-        <section id="settings">
+        <section id="settings" style="display:none;">
           <h2 class="text-2xl font-semibold mb-4">Settings</h2>
           <div class="bg-white p-4 rounded shadow space-y-4">
            <p>
