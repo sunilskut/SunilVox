@@ -1,0 +1,521 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Bulk Question Entry</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/firebase/9.22.0/firebase-app-compat.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/firebase/9.22.0/firebase-firestore-compat.min.js"></script>
+</head>
+<body class="bg-gray-50 min-h-screen">
+    <div class="container mx-auto px-4 py-6 max-w-6xl">
+        <!-- Header -->
+        <div class="text-center mb-8">
+            <h1 class="text-3xl font-bold text-gray-800 mb-2">Bulk Question Entry System</h1>
+            <p class="text-gray-600">Import multiple questions in JSON format with duplicate checking</p>
+        </div>
+
+        <!-- Settings Section -->
+        <div class="bg-white rounded-lg shadow-md p-6 mb-6">
+            <h2 class="text-xl font-semibold text-gray-800 mb-4">Question Settings</h2>
+            
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-2">Subject *</label>
+                    <select id="bulkSubject" onchange="loadUnits()" class="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent">
+                        <option value="Computer Science & Applications">Computer Science & Applications</option>
+                        <option value="Economics">Economics</option>
+                    </select>
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-2">Paper *</label>
+                    <select id="bulkPaper" onchange="loadUnits()" class="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent">
+                        <option value="Paper1">Paper1 (Common)</option>
+                        <option value="Paper2">Paper2 (Subject Specific)</option>
+                    </select>
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-2">Unit *</label>
+                    <select id="bulkUnit" class="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent">
+                        <option value="">Loading units...</option>
+                    </select>
+                </div>
+            </div>
+
+            <div class="mb-4">
+                <label class="block text-sm font-medium text-gray-700 mb-2">Starting Question Number</label>
+                <input type="number" id="startingQNo" min="1" class="w-full md:w-48 p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent" placeholder="Auto-detect">
+            </div>
+        </div>
+
+        <!-- Input Section -->
+        <div class="bg-white rounded-lg shadow-md p-6 mb-6">
+            <h2 class="text-xl font-semibold text-gray-800 mb-4">Bulk Question Data</h2>
+            
+            <div class="mb-4">
+                <label class="block text-sm font-medium text-gray-700 mb-2">
+                    Paste Question Data
+                    <span class="text-xs text-gray-500">(Format: JSON objects separated by newlines or spaces)</span>
+                </label>
+                <textarea 
+                    id="bulkQuestionText" 
+                    rows="15" 
+                    class="w-full p-4 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-y font-mono text-sm"
+                    placeholder='{ "question": "Which scheduling algorithm may lead to the convoy effect?", "optionA": "Round Robin", "optionB": "FCFS", "optionC": "Shortest Job First", "optionD": "Multilevel Queue Scheduling", "ans": "B", "exp": "The **FCFS (First-Come, First-Serve)** scheduling algorithm can lead to the convoy effect..." }
+{ "question": "Which scheduling algorithm is considered preemptive?", "optionA": "FCFS", "optionB": "Round Robin", "optionC": "Shortest Remaining Time First", "optionD": "Priority Scheduling", "ans": "C", "exp": "**Shortest Remaining Time First (SRTF)** is a preemptive version..." }'
+                ></textarea>
+            </div>
+
+            <div class="flex flex-col md:flex-row gap-4">
+                <button onclick="parseAndValidateQuestions()" class="bg-green-600 text-white px-6 py-3 rounded-lg hover:bg-green-700 transition-colors font-medium">
+                    Parse & Validate Questions
+                </button>
+                <button onclick="saveBulkQuestions()" id="saveButton" disabled class="bg-gray-400 text-white px-6 py-3 rounded-lg cursor-not-allowed font-medium">
+                    Save Questions to Firebase
+                </button>
+            </div>
+        </div>
+
+        <!-- Validation Results -->
+        <div id="validationResults" class="bg-white rounded-lg shadow-md p-6 mb-6 hidden">
+            <h2 class="text-xl font-semibold text-gray-800 mb-4">Validation Results</h2>
+            <div id="validationContent"></div>
+        </div>
+
+        <!-- Progress Section -->
+        <div id="progressSection" class="bg-white rounded-lg shadow-md p-6 hidden">
+            <h2 class="text-xl font-semibold text-gray-800 mb-4">Save Progress</h2>
+            <div class="mb-4">
+                <div class="bg-gray-200 rounded-full h-4">
+                    <div id="progressBar" class="bg-blue-600 h-4 rounded-full transition-all duration-300" style="width: 0%"></div>
+                </div>
+                <div class="mt-2 text-sm text-gray-600">
+                    <span id="progressText">0 / 0 questions saved</span>
+                </div>
+            </div>
+            <div id="progressLog" class="max-h-64 overflow-y-auto bg-gray-50 p-4 rounded-lg text-sm"></div>
+        </div>
+
+        <!-- Status Messages -->
+        <div id="statusMessage" class="mt-4 p-3 rounded-lg hidden"></div>
+    </div>
+
+    <script>
+        let db = null;
+        let parsedQuestions = [];
+        let currentQuestionNumber = 1;
+
+        // Initialize Firebase automatically when page loads
+        document.addEventListener('DOMContentLoaded', function() {
+            initializeFirebase();
+        });
+
+        // Initialize Firebase
+        function initializeFirebase() {
+            const firebaseConfig = {
+                apiKey: "AIzaSyC3Euw4CyPnMtHnyClV1tVmkNtfIFTXc9I",
+                authDomain: "sunilvox-1.firebaseapp.com",
+                projectId: "sunilvox-1",
+                storageBucket: "sunilvox-1.firebasestorage.app",
+                messagingSenderId: "1046912567084",
+                appId: "1:1046912567084:web:8a36a701601bfee59fce89",
+                measurementId: "G-C1GVJ38N09"
+            };
+
+            try {
+                firebase.initializeApp(firebaseConfig);
+                db = firebase.firestore();
+                
+                // Get the next question number and load units
+                getNextQuestionNumber();
+                loadUnits();
+                
+            } catch (error) {
+                console.error('Firebase initialization failed:', error);
+                showStatus('Firebase initialization failed. Please refresh the page.', 'error');
+            }
+        }
+
+        // Get next question number from Firebase
+        async function getNextQuestionNumber() {
+            try {
+                const questionsRef = db.collection('questions');
+               // const snapshot = await questionsRef.orderBy('qNo', 'desc').limit(1).get();
+const snapshot = await questionsRef.get();
+                
+                if (!snapshot.empty) {
+                    const lastDoc = snapshot.size;
+                    const lastQNo = parseInt(lastDoc) || 0;
+                    currentQuestionNumber = lastQNo + 1;
+                } else {
+                    currentQuestionNumber = 1;
+                }
+                
+                document.getElementById('startingQNo').placeholder = `${currentQuestionNumber}`;
+            } catch (error) {
+                console.error('Error getting next question number:', error);
+                currentQuestionNumber = 1;
+                document.getElementById('startingQNo').placeholder = 'Auto-detect: 1';
+            }
+        }
+
+        // Load units from syllabus collection
+        async function loadUnits() {
+            if (!db) return;
+
+            const subject = document.getElementById('bulkSubject').value;
+            const paper = document.getElementById('bulkPaper').value;
+            const unitSelect = document.getElementById('bulkUnit');
+
+            unitSelect.innerHTML = '<option value="">Loading units...</option>';
+
+            try {
+                const syllabusRef = db.collection('syllabus');
+                const query = syllabusRef.where('subject', '==', subject).where('paper', '==', paper);
+                const snapshot = await query.get();
+
+                unitSelect.innerHTML = '<option value="">Select Unit</option>';
+
+                if (!snapshot.empty) {
+                    const units = [];
+                    snapshot.forEach(doc => {
+                        const data = doc.data();
+                        if (data.unit) {
+                            units.push(data.unit);
+                        }
+                    });
+
+                    const uniqueUnits = [...new Set(units)].sort();
+                    
+                    uniqueUnits.forEach(unit => {
+                        const option = document.createElement('option');
+                        option.value = unit;
+                        option.textContent = unit;
+                        unitSelect.appendChild(option);
+                    });
+                } else {
+                    unitSelect.innerHTML = '<option value="">No units found</option>';
+                }
+            } catch (error) {
+                console.error('Error loading units:', error);
+                unitSelect.innerHTML = '<option value="">Error loading units</option>';
+            }
+        }
+
+        // Parse and validate questions
+        async function parseAndValidateQuestions() {
+            const text = document.getElementById('bulkQuestionText').value.trim();
+            
+            if (!text) {
+                showStatus('Please enter question data', 'error');
+                return;
+            }
+
+            if (!db) {
+                showStatus('Firebase not initialized. Please refresh the page.', 'error');
+                return;
+            }
+
+            const subject = document.getElementById('bulkSubject').value;
+            const paper = document.getElementById('bulkPaper').value;
+            const unit = document.getElementById('bulkUnit').value;
+
+            if (!subject || !paper || !unit) {
+                showStatus('Please select Subject, Paper, and Unit', 'error');
+                return;
+            }
+
+            try {
+                // Parse JSON objects from text
+                const jsonObjects = [];
+                
+                // Split the text by looking for JSON object boundaries
+                // This regex finds complete JSON objects by matching braces
+                let currentPos = 0;
+                let braceCount = 0;
+                let inString = false;
+                let escaping = false;
+                let objectStart = -1;
+                
+                for (let i = 0; i < text.length; i++) {
+                    const char = text[i];
+                    
+                    if (escaping) {
+                        escaping = false;
+                        continue;
+                    }
+                    
+                    if (char === '\\' && inString) {
+                        escaping = true;
+                        continue;
+                    }
+                    
+                    if (char === '"' && !escaping) {
+                        inString = !inString;
+                        continue;
+                    }
+                    
+                    if (!inString) {
+                        if (char === '{') {
+                            if (braceCount === 0) {
+                                objectStart = i;
+                            }
+                            braceCount++;
+                        } else if (char === '}') {
+                            braceCount--;
+                            if (braceCount === 0 && objectStart !== -1) {
+                                // Found complete JSON object
+                                const jsonStr = text.substring(objectStart, i + 1);
+                                jsonObjects.push(jsonStr);
+                                objectStart = -1;
+                            }
+                        }
+                    }
+                }
+
+                if (jsonObjects.length === 0) {
+                    showStatus('No valid JSON objects found. Please check the format.', 'error');
+                    return;
+                }
+
+                parsedQuestions = [];
+                const validationResults = [];
+                let duplicateCount = 0;
+                let validCount = 0;
+                let errorCount = 0;
+
+                for (let i = 0; i < jsonObjects.length; i++) {
+                    const jsonStr = jsonObjects[i];
+                    const questionNum = i + 1;
+                    
+                    try {
+                        const questionData = JSON.parse(jsonStr);
+                        
+                        // Validate required fields
+                        const required = ['question', 'optionA', 'optionB', 'optionC', 'optionD', 'ans', 'exp'];
+                        const missing = required.filter(field => !questionData[field] || questionData[field].toString().trim() === '');
+                        
+                        if (missing.length > 0) {
+                            validationResults.push({
+                                questionNum,
+                                status: 'error',
+                                message: `Missing or empty fields: ${missing.join(', ')}`
+                            });
+                            errorCount++;
+                            continue;
+                        }
+
+                        // Validate answer format
+                        if (!['A', 'B', 'C', 'D'].includes(questionData.ans.toUpperCase())) {
+                            validationResults.push({
+                                questionNum,
+                                status: 'error',
+                                message: `Invalid answer format. Must be A, B, C, or D`
+                            });
+                            errorCount++;
+                            continue;
+                        }
+
+                        // Check for duplicates in Firebase
+                        const querySnapshot = await db.collection('questions')
+                            .where('question', '==', questionData.question.trim())
+                            .get();
+
+                        if (!querySnapshot.empty) {
+                            const existingDoc = querySnapshot.docs[0];
+                            const existingData = existingDoc.data();
+                            validationResults.push({
+                                questionNum,
+                                status: 'duplicate',
+                                message: `Duplicate found - Q#${existingData.qNo} (${existingData.subject}, ${existingData.paper}, ${existingData.unit})`
+                            });
+                            duplicateCount++;
+                            continue;
+                        }
+
+                        // Valid question
+                        parsedQuestions.push({
+                            ...questionData,
+                            ans: questionData.ans.toUpperCase() // Normalize answer to uppercase
+                        });
+                        validationResults.push({
+                            questionNum,
+                            status: 'valid',
+                            message: 'Ready to save'
+                        });
+                        validCount++;
+
+                    } catch (error) {
+                        validationResults.push({
+                            questionNum,
+                            status: 'error',
+                            message: `JSON parse error: ${error.message}`
+                        });
+                        errorCount++;
+                    }
+                }
+
+                // Display results
+                displayValidationResults(validationResults, validCount, duplicateCount, errorCount);
+                
+                // Enable save button if there are valid questions
+                const saveButton = document.getElementById('saveButton');
+                if (validCount > 0) {
+                    saveButton.disabled = false;
+                    saveButton.className = 'bg-blue-600 text-white px-6 py-3 rounded-lg hover:bg-blue-700 transition-colors font-medium';
+                } else {
+                    saveButton.disabled = true;
+                    saveButton.className = 'bg-gray-400 text-white px-6 py-3 rounded-lg cursor-not-allowed font-medium';
+                }
+
+            } catch (error) {
+                showStatus('Error parsing questions: ' + error.message, 'error');
+            }
+        }
+
+        // Display validation results
+        function displayValidationResults(results, validCount, duplicateCount, errorCount) {
+            const resultsDiv = document.getElementById('validationResults');
+            const contentDiv = document.getElementById('validationContent');
+
+            let html = `
+                <div class="mb-4 p-4 bg-blue-50 rounded-lg">
+                    <h3 class="font-semibold text-blue-800 mb-2">Summary</h3>
+                    <div class="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm">
+                        <div class="text-green-700">✓ Valid: ${validCount}</div>
+                        <div class="text-yellow-700">⚠ Duplicates: ${duplicateCount}</div>
+                        <div class="text-red-700">✗ Errors: ${errorCount}</div>
+                    </div>
+                </div>
+                <div class="space-y-2 max-h-64 overflow-y-auto">
+            `;
+
+            results.forEach(result => {
+                const statusClass = result.status === 'valid' ? 'bg-green-50 text-green-800' :
+                                   result.status === 'duplicate' ? 'bg-yellow-50 text-yellow-800' :
+                                   'bg-red-50 text-red-800';
+                
+                const statusIcon = result.status === 'valid' ? '✓' :
+                                  result.status === 'duplicate' ? '⚠' : '✗';
+
+                html += `
+                    <div class="p-3 rounded-lg ${statusClass}">
+                        <span class="font-medium">${statusIcon} Question ${result.questionNum}:</span>
+                        <span class="text-sm">${result.message}</span>
+                    </div>
+                `;
+            });
+
+            html += '</div>';
+            contentDiv.innerHTML = html;
+            resultsDiv.classList.remove('hidden');
+        }
+
+        // Save bulk questions
+        async function saveBulkQuestions() {
+            if (!db || parsedQuestions.length === 0) {
+                showStatus('No valid questions to save', 'error');
+                return;
+            }
+
+            const subject = document.getElementById('bulkSubject').value;
+            const paper = document.getElementById('bulkPaper').value;
+            const unit = document.getElementById('bulkUnit').value;
+            
+            let startingQNo = parseInt(document.getElementById('startingQNo').value) || currentQuestionNumber;
+
+            // Show progress section
+            const progressSection = document.getElementById('progressSection');
+            const progressBar = document.getElementById('progressBar');
+            const progressText = document.getElementById('progressText');
+            const progressLog = document.getElementById('progressLog');
+
+            progressSection.classList.remove('hidden');
+            progressLog.innerHTML = '';
+
+            let successCount = 0;
+            let errorCount = 0;
+
+            for (let i = 0; i < parsedQuestions.length; i++) {
+                const questionData = parsedQuestions[i];
+                const qNo = (startingQNo + i).toString();
+
+                const completeQuestionData = {
+                    qNo,
+                    subject,
+                    paper,
+                    unit,
+                    question: questionData.question.trim(),
+                    optionA: questionData.optionA.trim(),
+                    optionB: questionData.optionB.trim(),
+                    optionC: questionData.optionC.trim(),
+                    optionD: questionData.optionD.trim(),
+                    ans: questionData.ans,
+                    exp: questionData.exp.trim()
+                };
+
+                try {
+                    await db.collection('questions').doc(qNo).set(completeQuestionData);
+                    successCount++;
+                    
+                    progressLog.innerHTML += `<div class="text-green-600">✓ Q${qNo}: Saved successfully</div>`;
+                } catch (error) {
+                    errorCount++;
+                    progressLog.innerHTML += `<div class="text-red-600">✗ Q${qNo}: ${error.message}</div>`;
+                }
+
+                // Update progress
+                const progress = ((i + 1) / parsedQuestions.length) * 100;
+                progressBar.style.width = `${progress}%`;
+                progressText.textContent = `${i + 1} / ${parsedQuestions.length} questions processed`;
+
+                // Auto-scroll progress log
+                progressLog.scrollTop = progressLog.scrollHeight;
+
+                // Small delay to show progress
+                await new Promise(resolve => setTimeout(resolve, 100));
+            }
+
+            // Final status
+            if (errorCount === 0) {
+                showStatus(`All ${successCount} questions saved successfully!`, 'success');
+            } else {
+                showStatus(`${successCount} questions saved, ${errorCount} failed`, 'warning');
+            }
+
+            // Clear form and reset
+            document.getElementById('bulkQuestionText').value = '';
+            document.getElementById('validationResults').classList.add('hidden');
+            document.getElementById('saveButton').disabled = true;
+            document.getElementById('saveButton').className = 'bg-gray-400 text-white px-6 py-3 rounded-lg cursor-not-allowed font-medium';
+            parsedQuestions = [];
+            
+            // Update next question number
+            getNextQuestionNumber();
+        }
+
+        // Show status message
+        function showStatus(message, type) {
+            const statusDiv = document.getElementById('statusMessage');
+            statusDiv.textContent = message;
+            
+            let className = 'mt-4 p-3 rounded-lg ';
+            if (type === 'success') {
+                className += 'bg-green-100 text-green-800';
+            } else if (type === 'warning') {
+                className += 'bg-yellow-100 text-yellow-800';
+            } else {
+                className += 'bg-red-100 text-red-800';
+            }
+            
+            statusDiv.className = className;
+            statusDiv.classList.remove('hidden');
+            
+            setTimeout(() => {
+                statusDiv.classList.add('hidden');
+            }, 5000);
+        }
+    </script>
+</body>
+</html>

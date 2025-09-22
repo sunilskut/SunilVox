@@ -1,0 +1,389 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Question Bank - Firebase</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/firebase/9.23.0/firebase-app-compat.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/firebase/9.23.0/firebase-firestore-compat.min.js"></script>
+</head>
+<body class="bg-gray-100 min-h-screen">
+    <div class="container mx-auto px-4 py-8">
+        <header class="text-center mb-8">
+            <h1 class="text-4xl font-bold text-gray-800 mb-2">Question Bank</h1>
+            <p class="text-gray-600">Firebase Collection: questions</p>
+        </header>
+
+        <!-- Filters and Search Section -->
+        <div class="bg-white rounded-lg shadow-md p-6 mb-6">
+            <h2 class="text-xl font-semibold mb-4">Filters & Search</h2>
+            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-4">
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Subject</label>
+                    <select id="subjectFilter" class="w-full p-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent">
+                        <option value="">All Subjects</option>
+                    </select>
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Paper</label>
+                    <select id="paperFilter" class="w-full p-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent">
+                        <option value="">All Papers</option>
+                    </select>
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Unit</label>
+                    <select id="unitFilter" class="w-full p-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent">
+                        <option value="">All Units</option>
+                    </select>
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Question Number</label>
+                    <input type="text" id="questionSearch" placeholder="Enter question number" class="w-full p-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent">
+                </div>
+            </div>
+            <div class="flex items-center justify-between">
+                <button onclick="applyFilters()" class="bg-green-600 hover:bg-green-700 text-white font-medium py-2 px-4 rounded-lg transition duration-200">
+                    Apply Filters
+                </button>
+                <button onclick="clearFilters()" class="bg-gray-600 hover:bg-gray-700 text-white font-medium py-2 px-4 rounded-lg transition duration-200">
+                    Clear Filters
+                </button>
+                <div id="questionCount" class="text-sm font-medium text-gray-700">
+                    Total Questions: <span id="totalCount" class="text-blue-600 font-semibold">0</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- Firebase Config Section -->
+        <div class="bg-white rounded-lg shadow-md p-6 mb-6">
+            <h2 class="text-xl font-semibold mb-4">Firebase Configuration</h2>
+            <div class="flex items-center justify-between">
+                <div class="text-sm text-gray-600">
+                    <p><strong>Project:</strong> sunilvox-1</p>
+                    <p><strong>Status:</strong> <span id="connectionStatusText">Not Connected</span></p>
+                </div>
+                <button onclick="initializeFirebase()" class="bg-blue-600 hover:bg-blue-700 text-white font-medium py-2 px-4 rounded-lg transition duration-200">
+                    Connect to Firebase
+                </button>
+            </div>
+            <div id="connectionStatus" class="mt-2 text-sm"></div>
+        </div>
+
+        <!-- Loading Indicator -->
+        <div id="loading" class="hidden text-center py-8">
+            <div class="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+            <p class="mt-2 text-gray-600">Loading questions...</p>
+        </div>
+
+        <!-- Questions Container -->
+        <div id="questionsContainer" class="space-y-6">
+            <!-- Questions will be loaded here -->
+        </div>
+
+        <!-- No Questions Message -->
+        <div id="noQuestions" class="hidden text-center py-8">
+            <div class="text-gray-500">
+                <svg class="mx-auto h-12 w-12 text-gray-400 mb-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" />
+                </svg>
+                <h3 class="text-lg font-medium text-gray-900 mb-2">No questions found</h3>
+                <p class="text-gray-500">Connect to Firebase and ensure your 'questions' collection has data.</p>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let db = null;
+        let isConnected = false;
+        let allQuestions = [];
+        let filteredQuestions = [];
+
+        function initializeFirebase() {
+            const firebaseConfig = {
+                apiKey: "AIzaSyC3Euw4CyPnMtHnyClV1tVmkNtfIFTXc9I",
+                authDomain: "sunilvox-1.firebaseapp.com",
+                projectId: "sunilvox-1",
+                storageBucket: "sunilvox-1.firebasestorage.app",
+                messagingSenderId: "1046912567084",
+                appId: "1:1046912567084:web:8a36a701601bfee59fce89",
+                measurementId: "G-C1GVJ38N09"
+            };
+
+            try {
+                const app = firebase.initializeApp(firebaseConfig);
+                db = firebase.firestore();
+                isConnected = true;
+                showStatus('Connected to Firebase successfully!', 'success');
+                updateConnectionStatus('Connected', 'success');
+                loadQuestions();
+            } catch (error) {
+                showStatus('Error connecting to Firebase: ' + error.message, 'error');
+                updateConnectionStatus('Connection Failed', 'error');
+                console.error('Firebase initialization error:', error);
+            }
+        }
+
+        function showStatus(message, type) {
+            const statusDiv = document.getElementById('connectionStatus');
+            statusDiv.textContent = message;
+            statusDiv.className = `mt-2 text-sm ${type === 'success' ? 'text-green-600' : 'text-red-600'}`;
+        }
+
+        function updateConnectionStatus(status, type) {
+            const statusText = document.getElementById('connectionStatusText');
+            statusText.textContent = status;
+            statusText.className = type === 'success' ? 'text-green-600 font-medium' : 'text-red-600 font-medium';
+        }
+
+        async function loadQuestions() {
+            if (!isConnected || !db) {
+                showStatus('Not connected to Firebase. Please connect first.', 'error');
+                return;
+            }
+
+            const loading = document.getElementById('loading');
+            const container = document.getElementById('questionsContainer');
+            const noQuestions = document.getElementById('noQuestions');
+
+            loading.classList.remove('hidden');
+            container.innerHTML = '';
+            noQuestions.classList.add('hidden');
+
+            try {
+                const questionsRef = db.collection('questions');
+                const snapshot = await questionsRef.orderBy('qNo').get();
+
+                loading.classList.add('hidden');
+
+                if (snapshot.empty) {
+                    noQuestions.classList.remove('hidden');
+                    updateQuestionCount(0);
+                    return;
+                }
+
+                allQuestions = [];
+                snapshot.forEach(doc => {
+                    allQuestions.push({ id: doc.id, ...doc.data() });
+                });
+
+                populateFilterDropdowns();
+                filteredQuestions = [...allQuestions];
+                displayQuestions(filteredQuestions);
+                updateQuestionCount(filteredQuestions.length);
+            } catch (error) {
+                loading.classList.add('hidden');
+                console.error('Error loading questions:', error);
+                showStatus('Error loading questions: ' + error.message, 'error');
+            }
+        }
+
+        function populateFilterDropdowns() {
+            const subjects = [...new Set(allQuestions.map(q => q.subject).filter(s => s))];
+            const papers = [...new Set(allQuestions.map(q => q.paper).filter(p => p))];
+            const units = [...new Set(allQuestions.map(q => q.unit).filter(u => u))];
+
+            populateDropdown('subjectFilter', subjects);
+            populateDropdown('paperFilter', papers);
+            populateDropdown('unitFilter', units);
+        }
+
+        function populateDropdown(selectId, options) {
+            const select = document.getElementById(selectId);
+            const currentValue = select.value;
+            
+            // Clear existing options except the first one
+            while (select.options.length > 1) {
+                select.removeChild(select.lastChild);
+            }
+
+            options.sort().forEach(option => {
+                const optionElement = document.createElement('option');
+                optionElement.value = option;
+                optionElement.textContent = option;
+                select.appendChild(optionElement);
+            });
+
+            // Restore previous selection if it still exists
+            if (options.includes(currentValue)) {
+                select.value = currentValue;
+            }
+        }
+
+        function applyFilters() {
+            const subjectFilter = document.getElementById('subjectFilter').value;
+            const paperFilter = document.getElementById('paperFilter').value;
+            const unitFilter = document.getElementById('unitFilter').value;
+            const questionSearch = document.getElementById('questionSearch').value.trim();
+
+            filteredQuestions = allQuestions.filter(question => {
+                const matchesSubject = !subjectFilter || question.subject === subjectFilter;
+                const matchesPaper = !paperFilter || question.paper === paperFilter;
+                const matchesUnit = !unitFilter || question.unit === unitFilter;
+                const matchesQuestionNo = !questionSearch || question.qNo === questionSearch;
+
+                return matchesSubject && matchesPaper && matchesUnit && matchesQuestionNo;
+            });
+
+            displayQuestions(filteredQuestions);
+            updateQuestionCount(filteredQuestions.length);
+        }
+
+        function clearFilters() {
+            document.getElementById('subjectFilter').value = '';
+            document.getElementById('paperFilter').value = '';
+            document.getElementById('unitFilter').value = '';
+            document.getElementById('questionSearch').value = '';
+            
+            filteredQuestions = [...allQuestions];
+            displayQuestions(filteredQuestions);
+            updateQuestionCount(filteredQuestions.length);
+        }
+
+        function updateQuestionCount(count) {
+            document.getElementById('totalCount').textContent = count;
+        }
+
+        function displayQuestions(questions) {
+            const container = document.getElementById('questionsContainer');
+            const noQuestions = document.getElementById('noQuestions');
+            
+            container.innerHTML = '';
+            
+            if (questions.length === 0) {
+                noQuestions.classList.remove('hidden');
+                return;
+            }
+            
+            noQuestions.classList.add('hidden');
+            questions.forEach(q => {
+                const questionCard = createQuestionCard(q);
+                container.appendChild(questionCard);
+            });
+        }
+
+        function createQuestionCard(question) {
+            const card = document.createElement('div');
+            card.className = 'bg-white rounded-lg shadow-md p-6 hover:shadow-lg transition-shadow duration-200';
+
+            const correctAnswerLetter = question.ans || '';
+            const correctOption = question[`option${correctAnswerLetter}`] || '';
+
+            card.innerHTML = `
+                <div class="mb-4">
+                    <div class="flex items-center justify-between mb-3">
+                        <h3 class="text-lg font-semibold text-gray-800">Question ${question.qNo || 'N/A'}</h3>
+                        <div class="flex space-x-2">
+                            ${question.subject ? `<span class="bg-purple-100 text-purple-800 text-xs font-medium px-2.5 py-0.5 rounded">${question.subject}</span>` : ''}
+                            ${question.paper ? `<span class="bg-blue-100 text-blue-800 text-xs font-medium px-2.5 py-0.5 rounded">${question.paper}</span>` : ''}
+                            ${question.unit ? `<span class="bg-green-100 text-green-800 text-xs font-medium px-2.5 py-0.5 rounded">Unit ${question.unit}</span>` : ''}
+                        </div>
+                    </div>
+                    <p class="text-gray-700 text-base leading-relaxed mb-4">${question.question || 'No question text available'}</p>
+                </div>
+
+                <div class="mb-4">
+                    <h4 class="font-medium text-gray-800 mb-3">Options:</h4>
+                    <div class="space-y-2">
+                        ${['A', 'B', 'C', 'D'].map(letter => {
+                            const optionText = question[`option${letter}`] || '';
+                            const isCorrect = correctAnswerLetter === letter;
+                            return `
+                                <div class="flex items-start p-3 rounded-lg border ${isCorrect ? 'border-green-500 bg-green-50' : 'border-gray-200 bg-gray-50'}">
+                                    <span class="font-medium text-gray-700 mr-3 min-w-[20px]">${letter})</span>
+                                    <span class="text-gray-700 flex-1">${optionText}</span>
+                                    ${isCorrect ? '<span class="text-green-600 ml-2">✓</span>' : ''}
+                                </div>
+                            `;
+                        }).join('')}
+                    </div>
+                </div>
+
+                <div class="border-t pt-4">
+                    <h4 class="font-medium text-gray-800 mb-2">Explanation:</h4>
+                    <div class="bg-blue-50 p-4 rounded-lg">
+                        <p class="text-gray-700 text-sm leading-relaxed">${question.exp || 'No explanation available'}</p>
+                    </div>
+                </div>
+
+                <div class="mt-4 pt-4 border-t">
+                    <div class="flex items-center justify-between text-sm text-gray-500">
+                        <span>Correct Answer: <strong class="text-green-600">${correctAnswerLetter}</strong></span>
+                        <span>Question ID: ${question.id}</span>
+                    </div>
+                </div>
+            `;
+
+            return card;
+        }
+
+        // Add sample data functionality for testing
+        function addSampleQuestion() {
+            const sampleQuestion = {
+                ans: "A",
+                exp: "RISC (Reduced Instruction Set Computer) architecture is characterized by a small, highly optimized set of instructions (typically 50–100 or fewer) to simplify decoding and enable efficient pipelining. In contrast, CISC (Complex Instruction Set Computer) architectures feature a larger number of instructions (often hundreds), making option (A) the statement that is not true for RISC. The other options align with standard RISC features: B: Simple addressing modes, often limited to register-register or simple memory access, to reduce complexity. C: Load/store architecture, where only load and store instructions access memory, and arithmetic operations occur on registers. D: Fixed-length instructions (e.g., 32 bits), which facilitate uniform decoding and pipelining.",
+                optionA: "Large number of instructions",
+                optionB: "Simple addressing modes",
+                optionC: "Load/store architecture",
+                optionD: "Fixed-length instructions",
+                paper: "Computer Architecture",
+                subject: "Computer Science",
+                unit: "2",
+                qNo: "1",
+                question: "Which of the following is not true for RISC architecture?"
+            };
+
+            if (!isConnected || !db) {
+                alert('Please connect to Firebase first');
+                return;
+            }
+
+            db.collection('questions').add(sampleQuestion)
+                .then(() => {
+                    alert('Sample question added successfully!');
+                    loadQuestions();
+                })
+                .catch(error => {
+                    console.error('Error adding sample question:', error);
+                    alert('Error adding sample question: ' + error.message);
+                });
+        }
+
+        // Add refresh button functionality
+        function refreshQuestions() {
+            if (isConnected) {
+                loadQuestions();
+            } else {
+                alert('Please connect to Firebase first');
+            }
+        }
+
+        // Add event listeners for real-time filtering
+        document.addEventListener('DOMContentLoaded', function() {
+            const questionSearch = document.getElementById('questionSearch');
+            if (questionSearch) {
+                questionSearch.addEventListener('input', function() {
+                    if (this.value.trim() === '') {
+                        applyFilters();
+                    }
+                });
+                
+                questionSearch.addEventListener('keypress', function(e) {
+                    if (e.key === 'Enter') {
+                        applyFilters();
+                    }
+                });
+            }
+        });
+    </script>
+
+    <!-- Floating Action Buttons -->
+    <div class="fixed bottom-6 right-6 flex flex-col space-y-2">
+        <button onclick="refreshQuestions()" title="Refresh Questions" class="bg-blue-600 hover:bg-blue-700 text-white p-3 rounded-full shadow-lg transition duration-200">
+            <svg class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+            </svg>
+        </button>
+    </div>
+</body>
+</html>

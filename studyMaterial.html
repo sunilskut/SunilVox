@@ -1,0 +1,589 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Study Materials Reader</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/firebase/9.23.0/firebase-app-compat.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/firebase/9.23.0/firebase-firestore-compat.min.js"></script>
+    <style>
+        /* Custom scrollbar for desktop */
+        .custom-scrollbar::-webkit-scrollbar {
+            width: 8px;
+        }
+        .custom-scrollbar::-webkit-scrollbar-track {
+            background: #f1f5f9;
+        }
+        .custom-scrollbar::-webkit-scrollbar-thumb {
+            background: #cbd5e1;
+            border-radius: 4px;
+        }
+        .custom-scrollbar::-webkit-scrollbar-thumb:hover {
+            background: #94a3b8;
+        }
+        
+        /* Hide scrollbar on mobile for clean e-book experience */
+        @media (max-width: 768px) {
+            .mobile-reader {
+                -ms-overflow-style: none;
+                scrollbar-width: none;
+            }
+            .mobile-reader::-webkit-scrollbar {
+                display: none;
+            }
+        }
+        
+        /* Reading area full height */
+        .reading-area {
+            height: calc(100vh - 60px);
+        }
+        
+        /* Page transition animation */
+        .page-transition {
+            transition: transform 0.3s ease-in-out;
+        }
+        
+        /* Swipe indicators */
+        .swipe-indicator {
+            position: absolute;
+            top: 50%;
+            transform: translateY(-50%);
+            font-size: 2rem;
+            color: rgba(59, 130, 246, 0.3);
+            pointer-events: none;
+            opacity: 0;
+            transition: opacity 0.2s ease;
+        }
+        
+        .swipe-indicator.left {
+            left: 20px;
+        }
+        
+        .swipe-indicator.right {
+            right: 20px;
+        }
+        
+        .swipe-indicator.active {
+            opacity: 1;
+        }
+    </style>
+</head>
+<body class="bg-gray-50">
+    <!-- Compact Top Controls -->
+    <div class="bg-white shadow-sm border-b sticky top-0 z-50">
+        <div class="flex items-center justify-between px-2 py-1">
+            <!-- Firebase Connection Status -->
+            <div class="flex items-center space-x-2">
+                <div id="connectionDot" class="w-2 h-2 bg-red-500 rounded-full"></div>
+                <button onclick="initializeFirebase()" class="text-xs bg-blue-600 hover:bg-blue-700 text-white px-2 py-1 rounded">
+                    Connect
+                </button>
+            </div>
+            
+            <!-- Compact Filters -->
+            <div class="flex items-center space-x-1 flex-1 max-w-md mx-2">
+                <select id="subjectFilter" class="text-xs p-1 border border-gray-300 rounded focus:ring-1 focus:ring-blue-500 flex-1 min-w-0">
+                    <option value="">Subject</option>
+                </select>
+                <select id="paperFilter" class="text-xs p-1 border border-gray-300 rounded focus:ring-1 focus:ring-blue-500 flex-1 min-w-0">
+                    <option value="">Paper</option>
+                </select>
+                <select id="unitFilter" class="text-xs p-1 border border-gray-300 rounded focus:ring-1 focus:ring-blue-500 flex-1 min-w-0">
+                    <option value="">Unit</option>
+                </select>
+                <button onclick="loadMaterials()" class="text-xs bg-green-600 hover:bg-green-700 text-white px-2 py-1 rounded whitespace-nowrap">
+                    Load
+                </button>
+            </div>
+            
+            <!-- Page Navigation & Info -->
+            <div class="flex items-center space-x-2 text-xs">
+                <button id="prevBtn" onclick="previousPage()" class="p-1 rounded hover:bg-gray-200" disabled>
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/>
+                    </svg>
+                </button>
+                <span id="pageInfo" class="text-gray-600 whitespace-nowrap">0 / 0</span>
+                <button id="nextBtn" onclick="nextPage()" class="p-1 rounded hover:bg-gray-200" disabled>
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/>
+                    </svg>
+                </button>
+            </div>
+            
+            <!-- Settings -->
+            <div class="flex items-center space-x-1">
+                <button onclick="toggleFontSize()" class="text-xs p-1 rounded hover:bg-gray-200" title="Font Size">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
+                    </svg>
+                </button>
+                <button onclick="toggleTheme()" class="text-xs p-1 rounded hover:bg-gray-200" title="Theme">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z"/>
+                    </svg>
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Reading Area -->
+    <div class="reading-area relative overflow-hidden">
+        <!-- Swipe Indicators -->
+        <div class="swipe-indicator left" id="leftIndicator">‹</div>
+        <div class="swipe-indicator right" id="rightIndicator">›</div>
+        
+        <!-- Loading State -->
+        <div id="loadingState" class="flex items-center justify-center h-full">
+            <div class="text-center">
+                <div class="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto mb-4"></div>
+                <p class="text-gray-600">Select filters and click Load to begin reading</p>
+            </div>
+        </div>
+        
+        <!-- No Content State -->
+        <div id="noContentState" class="hidden flex items-center justify-center h-full">
+            <div class="text-center">
+                <svg class="mx-auto h-12 w-12 text-gray-400 mb-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.746 0 3.332.477 4.5 1.253v13C19.832 18.477 18.246 18 16.5 18c-1.746 0-3.332.477-4.5 1.253"/>
+                </svg>
+                <h3 class="text-lg font-medium text-gray-900 mb-2">No Study Materials Found</h3>
+                <p class="text-gray-500">Try different filter combinations or check your Firebase collection.</p>
+            </div>
+        </div>
+        
+        <!-- Reading Content -->
+        <div id="readingContent" class="hidden h-full">
+            <!-- Desktop View -->
+            <div id="desktopView" class="hidden md:block h-full">
+                <div id="desktopReader" class="h-full overflow-y-auto custom-scrollbar px-8 py-6">
+                    <div id="desktopContent" class="max-w-4xl mx-auto prose prose-lg">
+                        <!-- Content will be loaded here -->
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Mobile View -->
+            <div id="mobileView" class="md:hidden h-full">
+                <div id="mobileReader" class="h-full overflow-x-hidden mobile-reader">
+                    <div id="mobilePages" class="flex h-full page-transition">
+                        <!-- Pages will be loaded here -->
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let db = null;
+        let isConnected = false;
+        let studyMaterials = [];
+        let currentPage = 0;
+        let totalPages = 0;
+        let fontSize = 'medium';
+        let isDarkTheme = false;
+        let touchStartX = 0;
+        let touchStartY = 0;
+        let isSwipeEnabled = true;
+
+        // Firebase Configuration
+        function initializeFirebase() {
+            const firebaseConfig = {
+                apiKey: "AIzaSyC3Euw4CyPnMtHnyClV1tVmkNtfIFTXc9I",
+                authDomain: "sunilvox-1.firebaseapp.com",
+                projectId: "sunilvox-1",
+                storageBucket: "sunilvox-1.firebasestorage.app",
+                messagingSenderId: "1046912567084",
+                appId: "1:1046912567084:web:8a36a701601bfee59fce89",
+                measurementId: "G-C1GVJ38N09"
+            };
+
+            try {
+                const app = firebase.initializeApp(firebaseConfig);
+                db = firebase.firestore();
+                isConnected = true;
+                updateConnectionStatus(true);
+                loadFilterOptions();
+            } catch (error) {
+                console.error('Firebase initialization error:', error);
+                updateConnectionStatus(false);
+            }
+        }
+
+        function updateConnectionStatus(connected) {
+            const dot = document.getElementById('connectionDot');
+            dot.className = connected ? 'w-2 h-2 bg-green-500 rounded-full' : 'w-2 h-2 bg-red-500 rounded-full';
+        }
+
+        async function loadFilterOptions() {
+            if (!isConnected || !db) return;
+
+            try {
+                const snapshot = await db.collection('studyMaterials').get();
+                const materials = [];
+                
+                snapshot.forEach(doc => {
+                    materials.push(doc.data());
+                });
+
+                const subjects = [...new Set(materials.map(m => m.subject).filter(s => s))];
+                const papers = [...new Set(materials.map(m => m.paper).filter(p => p))];
+                const units = [...new Set(materials.map(m => m.unit).filter(u => u))];
+
+                populateDropdown('subjectFilter', subjects);
+                populateDropdown('paperFilter', papers);
+                populateDropdown('unitFilter', units);
+            } catch (error) {
+                console.error('Error loading filter options:', error);
+            }
+        }
+
+        function populateDropdown(selectId, options) {
+            const select = document.getElementById(selectId);
+            const placeholder = select.options[0].textContent;
+            
+            select.innerHTML = `<option value="">${placeholder}</option>`;
+            options.sort().forEach(option => {
+                const optionElement = document.createElement('option');
+                optionElement.value = option;
+                optionElement.textContent = option;
+                select.appendChild(optionElement);
+            });
+        }
+
+       async function loadMaterials() {
+    if (!isConnected || !db) {
+        alert('Please connect to Firebase first');
+        return;
+    }
+
+    const subject = (document.getElementById('subjectFilter').value || '').trim();
+    const paper = (document.getElementById('paperFilter').value || '').trim();
+    const unit = (document.getElementById('unitFilter').value || '').trim();
+
+    if (!subject && !paper && !unit) {
+        alert('Please select at least one filter');
+        return;
+    }
+
+    showLoadingState();
+
+    try {
+        // Fetch all documents from the collection (client-side will filter & sort)
+        const snapshot = await db.collection('studyMaterials').get();
+
+        if (snapshot.empty) {
+            showNoContentState();
+            return;
+        }
+
+        // Build array of docs
+        let items = [];
+        snapshot.forEach(doc => {
+            items.push({ id: doc.id, ...doc.data() });
+        });
+
+        // Apply client-side filters (only keep items matching all provided filters)
+        if (subject) items = items.filter(i => i.subject === subject);
+        if (paper)   items = items.filter(i => i.paper === paper);
+        if (unit)    items = items.filter(i => i.unit === unit);
+
+        if (items.length === 0) {
+            showNoContentState();
+            return;
+        }
+
+        // Client-side sort by 'order' (documents lacking 'order' go to the end)
+        items.sort((a, b) => {
+            const aOrd = (typeof a.order === 'number') ? a.order : Number.POSITIVE_INFINITY;
+            const bOrd = (typeof b.order === 'number') ? b.order : Number.POSITIVE_INFINITY;
+            return aOrd - bOrd;
+        });
+
+        studyMaterials = items;
+        setupReader();
+        showReadingContent();
+    } catch (error) {
+        console.error('Error loading materials:', error);
+        showNoContentState();
+    }
+}
+
+
+        function setupReader() {
+            totalPages = studyMaterials.length;
+            currentPage = 0;
+            
+            setupDesktopReader();
+            setupMobileReader();
+            updatePageInfo();
+            updateNavigationButtons();
+        }
+
+        function setupDesktopReader() {
+            const content = document.getElementById('desktopContent');
+            let html = '';
+            
+            studyMaterials.forEach((material, index) => {
+                html += `
+                    <div class="mb-12 ${index > 0 ? 'border-t pt-8' : ''}">
+                        <h2 class="text-2xl font-bold text-gray-800 mb-4">${material.title || `Chapter ${index + 1}`}</h2>
+                        <div class="text-gray-700 leading-relaxed whitespace-pre-line">${material.content || 'No content available'}</div>
+                    </div>
+                `;
+            });
+            
+            content.innerHTML = html;
+            applyTheme();
+            applyFontSize();
+        }
+
+        function setupMobileReader() {
+            const pagesContainer = document.getElementById('mobilePages');
+            pagesContainer.innerHTML = '';
+            
+            studyMaterials.forEach((material, index) => {
+                const page = document.createElement('div');
+                page.className = 'flex-shrink-0 w-full h-full overflow-y-auto px-4 py-6';
+                page.innerHTML = `
+                    <div class="max-w-full">
+                        <h2 class="text-xl font-bold text-gray-800 mb-4">${material.title || `Page ${index + 1}`}</h2>
+                        <div class="text-gray-700 leading-relaxed whitespace-pre-line text-sm">${material.content || 'No content available'}</div>
+                    </div>
+                `;
+                pagesContainer.appendChild(page);
+            });
+            
+            setupMobileSwipe();
+            updateMobilePagePosition();
+            applyTheme();
+            applyFontSize();
+        }
+
+        function setupMobileSwipe() {
+            const mobileReader = document.getElementById('mobileReader');
+            
+            mobileReader.addEventListener('touchstart', handleTouchStart, { passive: true });
+            mobileReader.addEventListener('touchmove', handleTouchMove, { passive: false });
+            mobileReader.addEventListener('touchend', handleTouchEnd, { passive: true });
+        }
+
+        function handleTouchStart(e) {
+            if (!isSwipeEnabled) return;
+            touchStartX = e.touches[0].clientX;
+            touchStartY = e.touches[0].clientY;
+        }
+
+        function handleTouchMove(e) {
+            if (!isSwipeEnabled || !touchStartX || !touchStartY) return;
+            
+            const touchX = e.touches[0].clientX;
+            const touchY = e.touches[0].clientY;
+            const diffX = touchStartX - touchX;
+            const diffY = touchStartY - touchY;
+            
+            // Prevent page turning if vertical scroll is detected
+            if (Math.abs(diffY) > Math.abs(diffX)) return;
+            
+            if (Math.abs(diffX) > 50) {
+                e.preventDefault();
+                
+                if (diffX > 0) {
+                    showSwipeIndicator('right');
+                } else {
+                    showSwipeIndicator('left');
+                }
+            }
+        }
+
+        function handleTouchEnd(e) {
+            if (!isSwipeEnabled || !touchStartX || !touchStartY) return;
+            
+            const touchEndX = e.changedTouches[0].clientX;
+            const touchEndY = e.changedTouches[0].clientY;
+            const diffX = touchStartX - touchEndX;
+            const diffY = touchStartY - touchEndY;
+            
+            // Reset indicators
+            hideSwipeIndicators();
+            
+            // Only process horizontal swipes
+            if (Math.abs(diffY) > Math.abs(diffX)) {
+                touchStartX = touchStartY = 0;
+                return;
+            }
+            
+            if (Math.abs(diffX) > 100) {
+                if (diffX > 0) {
+                    nextPage();
+                } else {
+                    previousPage();
+                }
+            }
+            
+            touchStartX = touchStartY = 0;
+        }
+
+        function showSwipeIndicator(direction) {
+            const indicator = document.getElementById(direction === 'left' ? 'leftIndicator' : 'rightIndicator');
+            indicator.classList.add('active');
+        }
+
+        function hideSwipeIndicators() {
+            document.getElementById('leftIndicator').classList.remove('active');
+            document.getElementById('rightIndicator').classList.remove('active');
+        }
+
+        function nextPage() {
+            if (currentPage < totalPages - 1) {
+                currentPage++;
+                updateMobilePagePosition();
+                updatePageInfo();
+                updateNavigationButtons();
+            }
+        }
+
+        function previousPage() {
+            if (currentPage > 0) {
+                currentPage--;
+                updateMobilePagePosition();
+                updatePageInfo();
+                updateNavigationButtons();
+            }
+        }
+
+        function updateMobilePagePosition() {
+            const pagesContainer = document.getElementById('mobilePages');
+            const translateX = -currentPage * 100;
+            pagesContainer.style.transform = `translateX(${translateX}%)`;
+        }
+
+        function updatePageInfo() {
+            document.getElementById('pageInfo').textContent = `${currentPage + 1} / ${totalPages}`;
+        }
+
+        function updateNavigationButtons() {
+            const prevBtn = document.getElementById('prevBtn');
+            const nextBtn = document.getElementById('nextBtn');
+            
+            prevBtn.disabled = currentPage === 0;
+            nextBtn.disabled = currentPage === totalPages - 1;
+            
+            prevBtn.className = currentPage === 0 
+                ? 'p-1 rounded text-gray-400 cursor-not-allowed'
+                : 'p-1 rounded hover:bg-gray-200';
+                
+            nextBtn.className = currentPage === totalPages - 1
+                ? 'p-1 rounded text-gray-400 cursor-not-allowed'
+                : 'p-1 rounded hover:bg-gray-200';
+        }
+
+        function toggleFontSize() {
+            const sizes = ['small', 'medium', 'large', 'xl'];
+            const currentIndex = sizes.indexOf(fontSize);
+            fontSize = sizes[(currentIndex + 1) % sizes.length];
+            applyFontSize();
+        }
+
+        function applyFontSize() {
+            const desktopContent = document.getElementById('desktopContent');
+            const mobilePages = document.getElementById('mobilePages');
+            
+            const sizeClasses = {
+                small: 'prose-sm',
+                medium: 'prose-base',
+                large: 'prose-lg',
+                xl: 'prose-xl'
+            };
+            
+            // Reset classes
+            desktopContent.className = desktopContent.className.replace(/prose-(sm|base|lg|xl)/g, '');
+            desktopContent.classList.add(sizeClasses[fontSize]);
+            
+            // Apply to mobile pages
+            const pages = mobilePages.querySelectorAll('div > div > div');
+            pages.forEach(page => {
+                page.className = page.className.replace(/text-(xs|sm|base|lg|xl)/g, '');
+                const mobileSizes = { small: 'text-xs', medium: 'text-sm', large: 'text-base', xl: 'text-lg' };
+                page.classList.add(mobileSizes[fontSize]);
+            });
+        }
+
+        function toggleTheme() {
+            isDarkTheme = !isDarkTheme;
+            applyTheme();
+        }
+
+        function applyTheme() {
+            const body = document.body;
+            const desktopReader = document.getElementById('desktopReader');
+            const mobilePages = document.getElementById('mobilePages');
+            
+            if (isDarkTheme) {
+                body.classList.add('bg-gray-900');
+                body.classList.remove('bg-gray-50');
+                desktopReader.classList.add('bg-gray-800', 'text-gray-100');
+                mobilePages.classList.add('bg-gray-800', 'text-gray-100');
+            } else {
+                body.classList.remove('bg-gray-900');
+                body.classList.add('bg-gray-50');
+                desktopReader.classList.remove('bg-gray-800', 'text-gray-100');
+                mobilePages.classList.remove('bg-gray-800', 'text-gray-100');
+            }
+        }
+
+        function showLoadingState() {
+            document.getElementById('loadingState').classList.remove('hidden');
+            document.getElementById('noContentState').classList.add('hidden');
+            document.getElementById('readingContent').classList.add('hidden');
+        }
+
+        function showNoContentState() {
+            document.getElementById('loadingState').classList.add('hidden');
+            document.getElementById('noContentState').classList.remove('hidden');
+            document.getElementById('readingContent').classList.add('hidden');
+        }
+
+        function showReadingContent() {
+            document.getElementById('loadingState').classList.add('hidden');
+            document.getElementById('noContentState').classList.add('hidden');
+            document.getElementById('readingContent').classList.remove('hidden');
+            
+            // Show appropriate view based on screen size
+            if (window.innerWidth >= 768) {
+                document.getElementById('desktopView').classList.remove('hidden');
+                document.getElementById('mobileView').classList.add('hidden');
+            } else {
+                document.getElementById('desktopView').classList.add('hidden');
+                document.getElementById('mobileView').classList.remove('hidden');
+            }
+        }
+
+        // Keyboard navigation for desktop
+        document.addEventListener('keydown', function(e) {
+            if (window.innerWidth >= 768) return; // Only for mobile
+            
+            if (e.key === 'ArrowLeft') {
+                e.preventDefault();
+                previousPage();
+            } else if (e.key === 'ArrowRight') {
+                e.preventDefault();
+                nextPage();
+            }
+        });
+
+        // Handle window resize
+        window.addEventListener('resize', function() {
+            if (studyMaterials.length > 0) {
+                showReadingContent();
+            }
+        });
+
+        // Initialize Firebase on load
+        window.addEventListener('DOMContentLoaded', function() {
+            initializeFirebase();
+        });
+    </script>
+</body>
+</html>

@@ -1,0 +1,524 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>UGC NET Syllabus Viewer</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/firebase/9.22.0/firebase-app-compat.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/firebase/9.22.0/firebase-firestore-compat.min.js"></script>
+</head>
+<body class="bg-gray-50 min-h-screen">
+    <div class="container mx-auto px-4 py-6 max-w-6xl">
+        <!-- Header -->
+        <div class="text-center mb-8">
+            <h1 class="text-3xl font-bold text-gray-800 mb-2">UGC NET Syllabus Viewer</h1>
+            <p class="text-gray-600">Explore syllabus topics with detailed explanations from the web</p>
+        </div>
+
+        <!-- Selection Panel -->
+        <div class="bg-white rounded-lg shadow-md p-6 mb-6">
+            <h2 class="text-xl font-semibold text-gray-800 mb-4">Select Syllabus</h2>
+            
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-2">Subject *</label>
+                    <select id="syllabusSubject" onchange="loadUnits()" class="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent">
+                        <option value="">Select Subject</option>
+                        <option value="Computer Science & Applications">Computer Science & Applications</option>
+                        <option value="Economics">Economics</option>
+                    </select>
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-2">Paper *</label>
+                    <select id="syllabusPaper" onchange="loadUnits()" class="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent">
+                        <option value="">Select Paper</option>
+                        <option value="Paper1">Paper1 (Common)</option>
+                        <option value="Paper2">Paper2 (Subject Specific)</option>
+                    </select>
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-2">Unit *</label>
+                    <select id="syllabusUnit" onchange="loadSyllabusTopics()" class="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent">
+                        <option value="">Select Unit</option>
+                    </select>
+                </div>
+            </div>
+
+            <div id="syllabusInfo" class="hidden bg-blue-50 p-4 rounded-lg">
+                <h3 class="font-semibold text-blue-800 mb-2" id="unitTitle">Unit Title</h3>
+                <p class="text-blue-700 text-sm" id="unitDescription">Unit description will appear here</p>
+            </div>
+        </div>
+
+        <!-- Topics Display -->
+        <div id="topicsSection" class="bg-white rounded-lg shadow-md p-6 hidden">
+            <div class="flex items-center justify-between mb-6">
+                <h2 class="text-xl font-semibold text-gray-800">Topics</h2>
+                <div class="text-sm text-gray-500">
+                    Click on any topic to get detailed information
+                </div>
+            </div>
+
+            <div id="topicsList" class="space-y-3">
+                <!-- Topics will be populated here -->
+            </div>
+        </div>
+
+        <!-- Topic Details Modal -->
+        <div id="topicModal" class="fixed inset-0 bg-black bg-opacity-50 hidden z-50">
+            <div class="flex items-center justify-center min-h-screen p-4">
+                <div class="bg-white rounded-lg shadow-xl w-full max-w-4xl max-h-[90vh] overflow-hidden">
+                    <!-- Modal Header -->
+                    <div class="px-6 py-4 border-b border-gray-200 flex items-center justify-between">
+                        <h3 class="text-lg font-semibold text-gray-800" id="modalTopicTitle">Topic Details</h3>
+                        <div class="flex items-center space-x-2">
+                            <button onclick="openInNewTab()" class="text-blue-600 hover:text-blue-800 text-sm">
+                                Open in New Tab
+                            </button>
+                            <button onclick="closeTopicModal()" class="text-gray-500 hover:text-gray-700">
+                                <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+                                </svg>
+                            </button>
+                        </div>
+                    </div>
+                    
+                    <!-- Loading State -->
+                    <div id="modalLoading" class="p-8 text-center">
+                        <div class="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto"></div>
+                        <p class="text-gray-600 mt-4">Loading detailed information...</p>
+                    </div>
+
+                    <!-- Modal Content -->
+                    <div id="modalContent" class="p-6 overflow-y-auto max-h-[70vh] hidden">
+                        <div id="topicDetails">
+                            <!-- Dynamic content will be loaded here -->
+                        </div>
+
+                        <!-- Related Links -->
+                        <div id="relatedLinks" class="mt-6 pt-6 border-t border-gray-200 hidden">
+                            <h4 class="font-semibold text-gray-800 mb-3">Related Resources</h4>
+                            <div id="linksList" class="space-y-2">
+                                <!-- Links will be populated here -->
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Error State -->
+                    <div id="modalError" class="p-8 text-center hidden">
+                        <div class="text-red-500 mb-4">
+                            <svg class="w-12 h-12 mx-auto" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                            </svg>
+                        </div>
+                        <p class="text-gray-600">Unable to load detailed information for this topic.</p>
+                        <button onclick="searchTopicManually()" class="mt-4 bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors">
+                            Search Manually
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Status Messages -->
+        <div id="statusMessage" class="mt-4 p-3 rounded-lg hidden"></div>
+    </div>
+
+    <script>
+        let db = null;
+        let currentTopic = '';
+        let currentTopicContext = '';
+
+        // Initialize Firebase automatically when page loads
+        document.addEventListener('DOMContentLoaded', function() {
+            initializeFirebase();
+        });
+
+        // Initialize Firebase
+        function initializeFirebase() {
+            const firebaseConfig = {
+                apiKey: "AIzaSyC3Euw4CyPnMtHnyClV1tVmkNtfIFTXc9I",
+                authDomain: "sunilvox-1.firebaseapp.com",
+                projectId: "sunilvox-1",
+                storageBucket: "sunilvox-1.firebasestorage.app",
+                messagingSenderId: "1046912567084",
+                appId: "1:1046912567084:web:8a36a701601bfee59fce89",
+                measurementId: "G-C1GVJ38N09"
+            };
+
+            try {
+                firebase.initializeApp(firebaseConfig);
+                db = firebase.firestore();
+            } catch (error) {
+                console.error('Firebase initialization failed:', error);
+                showStatus('Firebase initialization failed. Please refresh the page.', 'error');
+            }
+        }
+
+        // Load units based on subject and paper selection
+        async function loadUnits() {
+            if (!db) return;
+
+            const subject = document.getElementById('syllabusSubject').value;
+            const paper = document.getElementById('syllabusPaper').value;
+            const unitSelect = document.getElementById('syllabusUnit');
+
+            // Clear topics section
+            document.getElementById('topicsSection').classList.add('hidden');
+            document.getElementById('syllabusInfo').classList.add('hidden');
+
+            if (!subject || !paper) {
+                unitSelect.innerHTML = '<option value="">Select Unit</option>';
+                return;
+            }
+
+            unitSelect.innerHTML = '<option value="">Loading units...</option>';
+
+            try {
+                const syllabusRef = db.collection('syllabus');
+                const query = syllabusRef.where('subject', '==', subject).where('paper', '==', paper);
+                const snapshot = await query.get();
+
+                unitSelect.innerHTML = '<option value="">Select Unit</option>';
+
+                if (!snapshot.empty) {
+                    const units = [];
+                    snapshot.forEach(doc => {
+                        const data = doc.data();
+                        if (data.unit) {
+                            units.push({
+                                unit: data.unit,
+                                unitTitle: data.unitTitle || '',
+                                id: doc.id
+                            });
+                        }
+                    });
+
+                    // Remove duplicates and sort
+                    const uniqueUnits = units.filter((unit, index, self) => 
+                        index === self.findIndex(u => u.unit === unit.unit)
+                    ).sort((a, b) => a.unit.localeCompare(b.unit));
+                    
+                    uniqueUnits.forEach(unitData => {
+                        const option = document.createElement('option');
+                        option.value = unitData.unit;
+                        option.textContent = unitData.unitTitle ? 
+                            `${unitData.unit} - ${unitData.unitTitle}` : unitData.unit;
+                        option.dataset.title = unitData.unitTitle || '';
+                        unitSelect.appendChild(option);
+                    });
+                } else {
+                    unitSelect.innerHTML = '<option value="">No units found</option>';
+                }
+            } catch (error) {
+                console.error('Error loading units:', error);
+                unitSelect.innerHTML = '<option value="">Error loading units</option>';
+            }
+        }
+
+        // Load syllabus topics for selected unit
+        async function loadSyllabusTopics() {
+            if (!db) return;
+
+            const subject = document.getElementById('syllabusSubject').value;
+            const paper = document.getElementById('syllabusPaper').value;
+            const unit = document.getElementById('syllabusUnit').value;
+
+            if (!subject || !paper || !unit) {
+                document.getElementById('topicsSection').classList.add('hidden');
+                document.getElementById('syllabusInfo').classList.add('hidden');
+                return;
+            }
+
+            try {
+                const syllabusRef = db.collection('syllabus');
+                const query = syllabusRef.where('subject', '==', subject)
+                                       .where('paper', '==', paper)
+                                       .where('unit', '==', unit);
+                const snapshot = await query.get();
+
+                if (snapshot.empty) {
+                    showStatus('No syllabus data found for selected criteria', 'error');
+                    return;
+                }
+
+                // Get unit info and topics
+                let unitTitle = unit;
+                let unitDescription = '';
+                let allTopics = [];
+
+                snapshot.forEach(doc => {
+                    const data = doc.data();
+                    if (data.unitTitle) {
+                        unitTitle = data.unitTitle;
+                    }
+                    if (data.topics) {
+                        // Parse topics (could be comma-separated or line-separated)
+                        const topics = data.topics.split(/[,\n]/).map(topic => topic.trim()).filter(topic => topic);
+                        allTopics = [...allTopics, ...topics];
+                    }
+                });
+
+                // Remove duplicates
+                allTopics = [...new Set(allTopics)];
+
+                if (allTopics.length === 0) {
+                    showStatus('No topics found for this unit', 'warning');
+                    return;
+                }
+
+                // Display unit info
+                document.getElementById('unitTitle').textContent = unitTitle;
+                document.getElementById('unitDescription').textContent = `${subject} | ${paper} | ${allTopics.length} topics`;
+                document.getElementById('syllabusInfo').classList.remove('hidden');
+
+                // Display topics
+                displayTopics(allTopics, subject, paper, unit);
+
+                showStatus(`Loaded ${allTopics.length} topics successfully!`, 'success');
+
+            } catch (error) {
+                console.error('Error loading syllabus topics:', error);
+                showStatus('Error loading syllabus topics: ' + error.message, 'error');
+            }
+        }
+
+        // Display topics in rows
+        function displayTopics(topics, subject, paper, unit) {
+            const topicsList = document.getElementById('topicsList');
+            topicsList.innerHTML = '';
+
+            topics.forEach((topic, index) => {
+                const topicDiv = document.createElement('div');
+                topicDiv.className = 'flex items-center justify-between p-4 border border-gray-200 rounded-lg hover:bg-blue-50 hover:border-blue-300 cursor-pointer transition-colors';
+                topicDiv.onclick = () => openTopicDetails(topic, subject, paper, unit);
+
+                topicDiv.innerHTML = `
+                    <div class="flex items-center space-x-4">
+                        <div class="bg-blue-100 text-blue-800 px-3 py-1 rounded-full text-sm font-medium">
+                            ${index + 1}
+                        </div>
+                        <div>
+                            <h3 class="font-medium text-gray-800">${topic}</h3>
+                            <p class="text-sm text-gray-600">${subject} • ${paper} • ${unit}</p>
+                        </div>
+                    </div>
+                    <div class="text-blue-600 hover:text-blue-800">
+                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path>
+                        </svg>
+                    </div>
+                `;
+
+                topicsList.appendChild(topicDiv);
+            });
+
+            document.getElementById('topicsSection').classList.remove('hidden');
+        }
+
+        // Open topic details modal and fetch information
+        async function openTopicDetails(topic, subject, paper, unit) {
+            currentTopic = topic;
+            currentTopicContext = `${subject} ${paper} ${unit}`;
+            
+            document.getElementById('modalTopicTitle').textContent = topic;
+            document.getElementById('topicModal').classList.remove('hidden');
+            
+            // Show loading state
+            document.getElementById('modalLoading').classList.remove('hidden');
+            document.getElementById('modalContent').classList.add('hidden');
+            document.getElementById('modalError').classList.add('hidden');
+
+            try {
+                // Search for topic information
+                await searchTopicInformation(topic, subject, paper, unit);
+            } catch (error) {
+                console.error('Error loading topic details:', error);
+                showErrorState();
+            }
+        }
+
+        // Search for topic information using web search
+        async function searchTopicInformation(topic, subject, paper, unit) {
+            try {
+                // Construct search query with context
+                const searchQuery = `${topic} ${subject} UGC NET syllabus explanation`;
+                
+                // Simulate web search results (in a real implementation, you would use a search API)
+                // For demonstration, we'll create mock content based on the topic
+                const mockContent = generateMockContent(topic, subject, paper, unit);
+                
+                // Simulate loading delay
+                await new Promise(resolve => setTimeout(resolve, 1500));
+                
+                displayTopicContent(mockContent);
+                
+            } catch (error) {
+                console.error('Search error:', error);
+                showErrorState();
+            }
+        }
+
+        // Generate mock content (in real implementation, this would come from web search API)
+        function generateMockContent(topic, subject, paper, unit) {
+            const content = {
+                definition: `${topic} is a fundamental concept in ${subject} that covers various aspects relevant to UGC NET ${paper} examination.`,
+                keyPoints: [
+                    `Understanding the core principles of ${topic}`,
+                    `Applications and practical examples in ${subject}`,
+                    `Important theories and methodologies related to ${topic}`,
+                    `Recent developments and research in this area`,
+                    `Exam-specific important points for UGC NET preparation`
+                ],
+                importance: `${topic} is crucial for UGC NET ${paper} as it forms the foundation for understanding more advanced concepts in ${subject}. Students should focus on both theoretical understanding and practical applications.`,
+                examTips: [
+                    `Focus on definitions and key terminologies related to ${topic}`,
+                    `Practice previous year questions on this topic`,
+                    `Understand the relationship with other topics in ${unit}`,
+                    `Memorize important facts, figures, and dates if applicable`
+                ],
+                relatedTopics: [
+                    `Advanced concepts in ${topic}`,
+                    `${topic} methodologies`,
+                    `Applications of ${topic}`,
+                    `Recent trends in ${topic}`
+                ]
+            };
+
+            return content;
+        }
+
+        // Display topic content in modal
+        function displayTopicContent(content) {
+            const detailsDiv = document.getElementById('topicDetails');
+            
+            let html = `
+                <div class="space-y-6">
+                    <div>
+                        <h4 class="text-lg font-semibold text-gray-800 mb-3">Overview</h4>
+                        <p class="text-gray-700 leading-relaxed">${content.definition}</p>
+                    </div>
+
+                    <div>
+                        <h4 class="text-lg font-semibold text-gray-800 mb-3">Key Learning Points</h4>
+                        <ul class="list-disc list-inside space-y-2 text-gray-700">
+                            ${content.keyPoints.map(point => `<li>${point}</li>`).join('')}
+                        </ul>
+                    </div>
+
+                    <div>
+                        <h4 class="text-lg font-semibold text-gray-800 mb-3">Importance for UGC NET</h4>
+                        <p class="text-gray-700 leading-relaxed">${content.importance}</p>
+                    </div>
+
+                    <div>
+                        <h4 class="text-lg font-semibold text-gray-800 mb-3">Exam Preparation Tips</h4>
+                        <ul class="list-disc list-inside space-y-2 text-gray-700">
+                            ${content.examTips.map(tip => `<li>${tip}</li>`).join('')}
+                        </ul>
+                    </div>
+                </div>
+            `;
+
+            detailsDiv.innerHTML = html;
+
+            // Generate related links
+            generateRelatedLinks(content.relatedTopics);
+
+            // Hide loading, show content
+            document.getElementById('modalLoading').classList.add('hidden');
+            document.getElementById('modalContent').classList.remove('hidden');
+        }
+
+        // Generate related links
+        function generateRelatedLinks(relatedTopics) {
+            const linksDiv = document.getElementById('linksList');
+            
+            let html = '';
+            relatedTopics.forEach(relatedTopic => {
+                const searchUrl = `https://www.google.com/search?q=${encodeURIComponent(relatedTopic + ' UGC NET ' + currentTopicContext)}`;
+                const wikipediaUrl = `https://en.wikipedia.org/wiki/${encodeURIComponent(relatedTopic)}`;
+                
+                html += `
+                    <div class="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+                        <span class="text-gray-700">${relatedTopic}</span>
+                        <div class="flex space-x-2">
+                            <a href="${wikipediaUrl}" target="_blank" class="text-blue-600 hover:text-blue-800 text-sm">
+                                Wikipedia
+                            </a>
+                            <a href="${searchUrl}" target="_blank" class="text-blue-600 hover:text-blue-800 text-sm">
+                                Google
+                            </a>
+                        </div>
+                    </div>
+                `;
+            });
+
+            linksDiv.innerHTML = html;
+            document.getElementById('relatedLinks').classList.remove('hidden');
+        }
+
+        // Show error state
+        function showErrorState() {
+            document.getElementById('modalLoading').classList.add('hidden');
+            document.getElementById('modalContent').classList.add('hidden');
+            document.getElementById('modalError').classList.remove('hidden');
+        }
+
+        // Open current topic in new tab for manual search
+        function openInNewTab() {
+            const searchUrl = `https://www.google.com/search?q=${encodeURIComponent(currentTopic + ' UGC NET ' + currentTopicContext + ' explanation')}`;
+            window.open(searchUrl, '_blank');
+        }
+
+        // Manual search function
+        function searchTopicManually() {
+            openInNewTab();
+        }
+
+        // Close topic modal
+        function closeTopicModal() {
+            document.getElementById('topicModal').classList.add('hidden');
+        }
+
+        // Close modal when clicking outside
+        document.getElementById('topicModal').addEventListener('click', function(e) {
+            if (e.target === this) {
+                closeTopicModal();
+            }
+        });
+
+        // Keyboard shortcuts
+        document.addEventListener('keydown', function(e) {
+            if (!document.getElementById('topicModal').classList.contains('hidden')) {
+                if (e.key === 'Escape') {
+                    closeTopicModal();
+                }
+            }
+        });
+
+        // Show status message
+        function showStatus(message, type) {
+            const statusDiv = document.getElementById('statusMessage');
+            statusDiv.textContent = message;
+            
+            let className = 'mt-4 p-3 rounded-lg ';
+            if (type === 'success') {
+                className += 'bg-green-100 text-green-800';
+            } else if (type === 'warning') {
+                className += 'bg-yellow-100 text-yellow-800';
+            } else {
+                className += 'bg-red-100 text-red-800';
+            }
+            
+            statusDiv.className = className;
+            statusDiv.classList.remove('hidden');
+            
+            setTimeout(() => {
+                statusDiv.classList.add('hidden');
+            }, 5000);
+        }
+    </script>
+</body>
+</html>

@@ -1,0 +1,905 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>UGC NET Mock Test</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/firebase/9.22.0/firebase-app-compat.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/firebase/9.22.0/firebase-firestore-compat.min.js"></script>
+</head>
+<body class="bg-gray-50 min-h-screen">
+    <div class="container mx-auto px-4 py-6 max-w-6xl">
+        <!-- Header -->
+        <div class="text-center mb-8">
+            <h1 class="text-3xl font-bold text-gray-800 mb-2">UGC NET Mock Test</h1>
+            <p class="text-gray-600">Practice with real exam format and get instant results</p>
+        </div>
+
+        <!-- Test Configuration -->
+        <div id="testConfig" class="bg-white rounded-lg shadow-md p-6 mb-6">
+            <h2 class="text-xl font-semibold text-gray-800 mb-4">Test Configuration</h2>
+            
+            <div class="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-2">Subject *</label>
+                    <select id="testSubject" onchange="loadUnits()" class="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent">
+                        <option value="">Select Subject</option>
+                        <option value="Computer Science & Applications">Computer Science & Applications</option>
+                        <option value="Economics">Economics</option>
+                    </select>
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-2">Paper *</label>
+                    <select id="testPaper" onchange="loadUnits()" class="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent">
+                        <option value="">Select Paper</option>
+                        <option value="Paper1">Paper1 (Common)</option>
+                        <option value="Paper2">Paper2 (Subject Specific)</option>
+                    </select>
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-2">Unit</label>
+                    <select id="testUnit" class="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent">
+                        <option value="">All Units</option>
+                    </select>
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-2">Number of Questions</label>
+                    <select id="questionCount" class="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent">
+                        <option value="10">10 Questions</option>
+                        <option value="25">25 Questions</option>
+                        <option value="50" selected>50 Questions</option>
+                        <option value="100">100 Questions</option>
+                        <option value="all">All Available</option>
+                    </select>
+                </div>
+            </div>
+
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-2">Test Duration (minutes)</label>
+                    <select id="testDuration" class="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent">
+                        <option value="15">15 minutes</option>
+                        <option value="30">30 minutes</option>
+                        <option value="60">60 minutes</option>
+                        <option value="120">120 minutes</option>
+                        <option value="180" selected>180 minutes (3 hours)</option>
+                    </select>
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-2">Test Mode</label>
+                    <select id="testMode" class="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent">
+                        <option value="practice">Practice Mode (Show answers immediately)</option>
+                        <option value="exam" selected>Exam Mode (Show results at end)</option>
+                    </select>
+                </div>
+            </div>
+
+            <button onclick="startTest()" class="w-full md:w-auto bg-blue-600 text-white px-8 py-3 rounded-lg hover:bg-blue-700 transition-colors font-medium">
+                Start Mock Test
+            </button>
+        </div>
+
+        <!-- Test Interface -->
+        <div id="testInterface" class="hidden">
+            <!-- Test Header -->
+            <div class="bg-white rounded-lg shadow-md p-4 mb-6 flex flex-col md:flex-row md:items-center md:justify-between">
+                <div class="mb-2 md:mb-0">
+                    <h2 class="text-lg font-semibold text-gray-800">UGC NET Mock Test</h2>
+                    <p class="text-sm text-gray-600" id="testInfo">Subject: Computer Science | Paper: Paper2 | Questions: 50</p>
+                </div>
+                <div class="flex items-center space-x-4">
+                    <div class="text-center">
+                        <div class="text-2xl font-bold text-blue-600" id="timer">03:00:00</div>
+                        <div class="text-xs text-gray-500">Time Remaining</div>
+                    </div>
+                    <button onclick="submitTest()" class="bg-red-600 text-white px-4 py-2 rounded-lg hover:bg-red-700 transition-colors">
+                        Submit Test
+                    </button>
+                </div>
+            </div>
+
+            <!-- Question Navigation -->
+            <div class="bg-white rounded-lg shadow-md p-4 mb-6">
+                <div class="flex flex-wrap gap-2" id="questionNav">
+                    <!-- Navigation buttons will be generated here -->
+                </div>
+            </div>
+
+            <!-- Question Display -->
+            <div class="bg-white rounded-lg shadow-md p-6 mb-6">
+                <div class="mb-4">
+                    <div class="flex justify-between items-center mb-4">
+                        <h3 class="text-lg font-medium text-gray-800">
+                            Question <span id="currentQuestionNum">1</span> of <span id="totalQuestions">50</span>
+                        </h3>
+                        <div class="flex items-center space-x-2">
+                            <button onclick="markForReview()" id="markReviewBtn" class="text-sm bg-yellow-100 text-yellow-700 px-3 py-1 rounded-lg hover:bg-yellow-200 transition-colors">
+                                Mark for Review
+                            </button>
+                            <button onclick="clearAnswer()" class="text-sm bg-gray-100 text-gray-700 px-3 py-1 rounded-lg hover:bg-gray-200 transition-colors">
+                                Clear Answer
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                <div id="questionContent" class="mb-6">
+                    <p class="text-gray-800 mb-4 text-lg leading-relaxed" id="questionText">Loading question...</p>
+                    
+                    <div class="space-y-3" id="optionsContainer">
+                        <!-- Options will be generated here -->
+                    </div>
+                </div>
+
+                <!-- Practice Mode Explanation -->
+                <div id="explanationSection" class="hidden mt-6 p-4 bg-blue-50 rounded-lg">
+                    <h4 class="font-semibold text-blue-800 mb-2">Explanation:</h4>
+                    <p class="text-blue-700" id="explanationText"></p>
+                </div>
+
+                <!-- Navigation Buttons -->
+                <div class="flex justify-between items-center pt-6 border-t">
+                    <button onclick="previousQuestion()" id="prevBtn" class="bg-gray-100 text-gray-700 px-6 py-2 rounded-lg hover:bg-gray-200 transition-colors" disabled>
+                        Previous
+                    </button>
+                    <div class="text-sm text-gray-500">
+                        Use arrow keys to navigate
+                    </div>
+                    <button onclick="nextQuestion()" id="nextBtn" class="bg-blue-600 text-white px-6 py-2 rounded-lg hover:bg-blue-700 transition-colors">
+                        Next
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Results Section -->
+        <div id="resultsSection" class="hidden">
+            <div class="bg-white rounded-lg shadow-md p-6 mb-6">
+                <h2 class="text-2xl font-bold text-gray-800 mb-6 text-center">Test Results</h2>
+                
+                <div class="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
+                    <div class="text-center p-4 bg-green-50 rounded-lg">
+                        <div class="text-3xl font-bold text-green-600" id="scorePercent">85%</div>
+                        <div class="text-sm text-green-700">Overall Score</div>
+                    </div>
+                    <div class="text-center p-4 bg-blue-50 rounded-lg">
+                        <div class="text-3xl font-bold text-blue-600" id="correctCount">42</div>
+                        <div class="text-sm text-blue-700">Correct Answers</div>
+                    </div>
+                    <div class="text-center p-4 bg-red-50 rounded-lg">
+                        <div class="text-3xl font-bold text-red-600" id="incorrectCount">6</div>
+                        <div class="text-sm text-red-700">Incorrect Answers</div>
+                    </div>
+                    <div class="text-center p-4 bg-yellow-50 rounded-lg">
+                        <div class="text-3xl font-bold text-yellow-600" id="unattemptedCount">2</div>
+                        <div class="text-sm text-yellow-700">Not Attempted</div>
+                    </div>
+                </div>
+
+                <div class="mb-6">
+                    <h3 class="text-lg font-semibold text-gray-800 mb-4">Time Analysis</h3>
+                    <div class="bg-gray-50 p-4 rounded-lg">
+                        <div class="flex justify-between items-center">
+                            <span class="text-gray-600">Total Time:</span>
+                            <span class="font-medium" id="totalTime">02:45:30</span>
+                        </div>
+                        <div class="flex justify-between items-center mt-2">
+                            <span class="text-gray-600">Average Time per Question:</span>
+                            <span class="font-medium" id="avgTime">3.3 minutes</span>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="flex flex-col md:flex-row gap-4">
+                    <button onclick="reviewAnswers()" class="bg-blue-600 text-white px-6 py-3 rounded-lg hover:bg-blue-700 transition-colors">
+                        Review Answers
+                    </button>
+                    <button onclick="restartTest()" class="bg-green-600 text-white px-6 py-3 rounded-lg hover:bg-green-700 transition-colors">
+                        Take Another Test
+                    </button>
+                    <button onclick="downloadResults()" class="bg-purple-600 text-white px-6 py-3 rounded-lg hover:bg-purple-700 transition-colors">
+                        Download Results
+                    </button>
+                </div>
+            </div>
+
+            <!-- Answer Review -->
+            <div id="answerReview" class="hidden bg-white rounded-lg shadow-md p-6">
+                <h3 class="text-xl font-semibold text-gray-800 mb-4">Answer Review</h3>
+                <div id="reviewContent"></div>
+            </div>
+        </div>
+
+        <!-- Status Messages -->
+        <div id="statusMessage" class="mt-4 p-3 rounded-lg hidden"></div>
+    </div>
+
+    <script>
+        let db = null;
+        let questions = [];
+        let currentQuestionIndex = 0;
+        let userAnswers = {};
+        let markedForReview = new Set();
+        let testStartTime = null;
+        let testTimer = null;
+        let testDurationMinutes = 180;
+        let testMode = 'exam';
+
+        // Initialize Firebase automatically when page loads
+        document.addEventListener('DOMContentLoaded', function() {
+            initializeFirebase();
+            setupKeyboardNavigation();
+        });
+
+        // Initialize Firebase
+        function initializeFirebase() {
+            const firebaseConfig = {
+                apiKey: "AIzaSyC3Euw4CyPnMtHnyClV1tVmkNtfIFTXc9I",
+                authDomain: "sunilvox-1.firebaseapp.com",
+                projectId: "sunilvox-1",
+                storageBucket: "sunilvox-1.firebasestorage.app",
+                messagingSenderId: "1046912567084",
+                appId: "1:1046912567084:web:8a36a701601bfee59fce89",
+                measurementId: "G-C1GVJ38N09"
+            };
+
+            try {
+                firebase.initializeApp(firebaseConfig);
+                db = firebase.firestore();
+                loadUnits();
+            } catch (error) {
+                console.error('Firebase initialization failed:', error);
+                showStatus('Firebase initialization failed. Please refresh the page.', 'error');
+            }
+        }
+
+        // Load units from syllabus collection
+        async function loadUnits() {
+            if (!db) return;
+
+            const subject = document.getElementById('testSubject').value;
+            const paper = document.getElementById('testPaper').value;
+            const unitSelect = document.getElementById('testUnit');
+
+            if (!subject || !paper) {
+                unitSelect.innerHTML = '<option value="">All Units</option>';
+                return;
+            }
+
+            unitSelect.innerHTML = '<option value="">Loading units...</option>';
+
+            try {
+                const syllabusRef = db.collection('syllabus');
+                const query = syllabusRef.where('subject', '==', subject).where('paper', '==', paper);
+                const snapshot = await query.get();
+
+                unitSelect.innerHTML = '<option value="">All Units</option>';
+
+                if (!snapshot.empty) {
+                    const units = [];
+                    snapshot.forEach(doc => {
+                        const data = doc.data();
+                        if (data.unit) {
+                            units.push(data.unit);
+                        }
+                    });
+
+                    const uniqueUnits = [...new Set(units)].sort();
+                    
+                    uniqueUnits.forEach(unit => {
+                        const option = document.createElement('option');
+                        option.value = unit;
+                        option.textContent = unit;
+                        unitSelect.appendChild(option);
+                    });
+                }
+            } catch (error) {
+                console.error('Error loading units:', error);
+                unitSelect.innerHTML = '<option value="">Error loading units</option>';
+            }
+        }
+
+        // Start test
+        async function startTest() {
+            const subject = document.getElementById('testSubject').value;
+            const paper = document.getElementById('testPaper').value;
+            const unit = document.getElementById('testUnit').value;
+            const questionCount = document.getElementById('questionCount').value;
+            
+            testDurationMinutes = parseInt(document.getElementById('testDuration').value);
+            testMode = document.getElementById('testMode').value;
+
+            if (!subject || !paper) {
+                showStatus('Please select Subject and Paper', 'error');
+                return;
+            }
+
+            try {
+                // Load questions from Firebase
+                let query = db.collection('questions')
+                    .where('subject', '==', subject)
+                    .where('paper', '==', paper);
+
+                if (unit) {
+                    query = query.where('unit', '==', unit);
+                }
+
+                const snapshot = await query.get();
+                
+                if (snapshot.empty) {
+                    showStatus('No questions found for the selected criteria', 'error');
+                    return;
+                }
+
+                // Convert to array and shuffle
+                const allQuestions = [];
+                snapshot.forEach(doc => {
+                    allQuestions.push({ id: doc.id, ...doc.data() });
+                });
+
+                // Shuffle questions
+                for (let i = allQuestions.length - 1; i > 0; i--) {
+                    const j = Math.floor(Math.random() * (i + 1));
+                    [allQuestions[i], allQuestions[j]] = [allQuestions[j], allQuestions[i]];
+                }
+
+                // Select required number of questions
+                if (questionCount === 'all') {
+                    questions = allQuestions;
+                } else {
+                    questions = allQuestions.slice(0, parseInt(questionCount));
+                }
+
+                if (questions.length === 0) {
+                    showStatus('No questions available', 'error');
+                    return;
+                }
+
+                // Initialize test
+                userAnswers = {};
+                markedForReview = new Set();
+                currentQuestionIndex = 0;
+                testStartTime = new Date();
+
+                // Update test info
+                document.getElementById('testInfo').textContent = 
+                    `Subject: ${subject} | Paper: ${paper}${unit ? ` | Unit: ${unit}` : ''} | Questions: ${questions.length}`;
+                document.getElementById('totalQuestions').textContent = questions.length;
+
+                // Show test interface
+                document.getElementById('testConfig').classList.add('hidden');
+                document.getElementById('testInterface').classList.remove('hidden');
+
+                // Generate navigation
+                generateQuestionNavigation();
+
+                // Start timer
+                startTimer();
+
+                // Load first question
+                loadQuestion();
+
+                showStatus('Test started! Good luck!', 'success');
+
+            } catch (error) {
+                console.error('Error starting test:', error);
+                showStatus('Error starting test: ' + error.message, 'error');
+            }
+        }
+
+        // Generate question navigation
+        function generateQuestionNavigation() {
+            const nav = document.getElementById('questionNav');
+            nav.innerHTML = '';
+
+            for (let i = 0; i < questions.length; i++) {
+                const btn = document.createElement('button');
+                btn.textContent = i + 1;
+                btn.className = 'w-10 h-10 rounded-lg border-2 border-gray-300 hover:bg-gray-100 transition-colors text-sm font-medium';
+                btn.onclick = () => goToQuestion(i);
+                nav.appendChild(btn);
+            }
+
+            updateQuestionNavigation();
+        }
+
+        // Update question navigation colors
+        function updateQuestionNavigation() {
+            const nav = document.getElementById('questionNav');
+            const buttons = nav.children;
+
+            for (let i = 0; i < buttons.length; i++) {
+                const btn = buttons[i];
+                
+                // Reset classes
+                btn.className = 'w-10 h-10 rounded-lg border-2 transition-colors text-sm font-medium';
+
+                if (i === currentQuestionIndex) {
+                    // Current question
+                    btn.className += ' bg-blue-600 text-white border-blue-600';
+                } else if (userAnswers.hasOwnProperty(i)) {
+                    if (markedForReview.has(i)) {
+                        // Answered and marked for review
+                        btn.className += ' bg-purple-200 text-purple-800 border-purple-300';
+                    } else {
+                        // Answered
+                        btn.className += ' bg-green-200 text-green-800 border-green-300';
+                    }
+                } else if (markedForReview.has(i)) {
+                    // Not answered but marked for review
+                    btn.className += ' bg-yellow-200 text-yellow-800 border-yellow-300';
+                } else {
+                    // Not attempted
+                    btn.className += ' bg-gray-100 text-gray-600 border-gray-300 hover:bg-gray-200';
+                }
+            }
+        }
+
+        // Load current question
+        function loadQuestion() {
+            if (currentQuestionIndex >= questions.length) return;
+
+            const question = questions[currentQuestionIndex];
+            
+            document.getElementById('currentQuestionNum').textContent = currentQuestionIndex + 1;
+            document.getElementById('questionText').textContent = question.question;
+
+            // Generate options
+            const container = document.getElementById('optionsContainer');
+            container.innerHTML = '';
+
+            const options = ['A', 'B', 'C', 'D'];
+            options.forEach(option => {
+                const div = document.createElement('div');
+                div.className = 'flex items-center p-3 border rounded-lg cursor-pointer hover:bg-gray-50 transition-colors';
+                
+                const input = document.createElement('input');
+                input.type = 'radio';
+                input.name = 'answer';
+                input.value = option;
+                input.id = `option${option}`;
+                input.className = 'mr-3 w-4 h-4 text-blue-600';
+                input.onchange = () => selectAnswer(option);
+
+                const label = document.createElement('label');
+                label.htmlFor = `option${option}`;
+                label.className = 'flex-1 cursor-pointer';
+                label.innerHTML = `<span class="font-medium">(${option})</span> ${question[`option${option}`]}`;
+
+                div.appendChild(input);
+                div.appendChild(label);
+                container.appendChild(div);
+
+                // Set selected answer
+                if (userAnswers[currentQuestionIndex] === option) {
+                    input.checked = true;
+                    div.classList.add('bg-blue-50', 'border-blue-300');
+                }
+            });
+
+            // Update mark for review button
+            const markBtn = document.getElementById('markReviewBtn');
+            if (markedForReview.has(currentQuestionIndex)) {
+                markBtn.textContent = 'Unmark Review';
+                markBtn.className = 'text-sm bg-purple-100 text-purple-700 px-3 py-1 rounded-lg hover:bg-purple-200 transition-colors';
+            } else {
+                markBtn.textContent = 'Mark for Review';
+                markBtn.className = 'text-sm bg-yellow-100 text-yellow-700 px-3 py-1 rounded-lg hover:bg-yellow-200 transition-colors';
+            }
+
+            // Show explanation in practice mode
+            if (testMode === 'practice' && userAnswers.hasOwnProperty(currentQuestionIndex)) {
+                showExplanation();
+            } else {
+                document.getElementById('explanationSection').classList.add('hidden');
+            }
+
+            // Update navigation buttons
+            document.getElementById('prevBtn').disabled = currentQuestionIndex === 0;
+            document.getElementById('nextBtn').textContent = currentQuestionIndex === questions.length - 1 ? 'Finish' : 'Next';
+
+            updateQuestionNavigation();
+        }
+
+        // Select answer
+        function selectAnswer(option) {
+            userAnswers[currentQuestionIndex] = option;
+            
+            // Update option styling
+            const container = document.getElementById('optionsContainer');
+            const divs = container.children;
+            
+            for (let div of divs) {
+                div.classList.remove('bg-blue-50', 'border-blue-300');
+                const input = div.querySelector('input');
+                if (input.value === option) {
+                    div.classList.add('bg-blue-50', 'border-blue-300');
+                }
+            }
+
+            updateQuestionNavigation();
+
+            // Show explanation in practice mode
+            if (testMode === 'practice') {
+                showExplanation();
+            }
+        }
+
+        // Show explanation
+        function showExplanation() {
+            const question = questions[currentQuestionIndex];
+            const explanationSection = document.getElementById('explanationSection');
+            const explanationText = document.getElementById('explanationText');
+            
+            let explanation = `<strong>Correct Answer: ${question.ans}</strong><br><br>`;
+            explanation += question.exp;
+            
+            if (userAnswers[currentQuestionIndex]) {
+                const userAnswer = userAnswers[currentQuestionIndex];
+                if (userAnswer === question.ans) {
+                    explanation = `<div class="text-green-600 font-semibold mb-2">✓ Correct!</div>` + explanation;
+                } else {
+                    explanation = `<div class="text-red-600 font-semibold mb-2">✗ Incorrect. You selected: ${userAnswer}</div>` + explanation;
+                }
+            }
+            
+            explanationText.innerHTML = explanation;
+            explanationSection.classList.remove('hidden');
+        }
+
+        // Navigation functions
+        function previousQuestion() {
+            if (currentQuestionIndex > 0) {
+                currentQuestionIndex--;
+                loadQuestion();
+            }
+        }
+
+        function nextQuestion() {
+            if (currentQuestionIndex < questions.length - 1) {
+                currentQuestionIndex++;
+                loadQuestion();
+            } else {
+                submitTest();
+            }
+        }
+
+        function goToQuestion(index) {
+            currentQuestionIndex = index;
+            loadQuestion();
+        }
+
+        // Mark for review
+        function markForReview() {
+            if (markedForReview.has(currentQuestionIndex)) {
+                markedForReview.delete(currentQuestionIndex);
+            } else {
+                markedForReview.add(currentQuestionIndex);
+            }
+            loadQuestion();
+        }
+
+        // Clear answer
+        function clearAnswer() {
+            delete userAnswers[currentQuestionIndex];
+            loadQuestion();
+        }
+
+        // Timer functions
+        function startTimer() {
+            let timeLeft = testDurationMinutes * 60; // Convert to seconds
+            
+            testTimer = setInterval(() => {
+                timeLeft--;
+                
+                const hours = Math.floor(timeLeft / 3600);
+                const minutes = Math.floor((timeLeft % 3600) / 60);
+                const seconds = timeLeft % 60;
+                
+                document.getElementById('timer').textContent = 
+                    `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
+                
+                if (timeLeft <= 0) {
+                    clearInterval(testTimer);
+                    submitTest();
+                }
+            }, 1000);
+        }
+
+        // Submit test
+        function submitTest() {
+            if (!confirm('Are you sure you want to submit the test?')) {
+                return;
+            }
+
+            clearInterval(testTimer);
+            
+            // Calculate results
+            let correct = 0;
+            let incorrect = 0;
+            let unattempted = 0;
+            
+            questions.forEach((question, index) => {
+                if (userAnswers.hasOwnProperty(index)) {
+                    if (userAnswers[index] === question.ans) {
+                        correct++;
+                    } else {
+                        incorrect++;
+                    }
+                } else {
+                    unattempted++;
+                }
+            });
+
+            const totalTime = new Date() - testStartTime;
+            const scorePercent = Math.round((correct / questions.length) * 100);
+
+            // Display results
+            document.getElementById('scorePercent').textContent = `${scorePercent}%`;
+            document.getElementById('correctCount').textContent = correct;
+            document.getElementById('incorrectCount').textContent = incorrect;
+            document.getElementById('unattemptedCount').textContent = unattempted;
+            
+            const totalHours = Math.floor(totalTime / (1000 * 60 * 60));
+            const totalMinutes = Math.floor((totalTime % (1000 * 60 * 60)) / (1000 * 60));
+            const totalSeconds = Math.floor((totalTime % (1000 * 60)) / 1000);
+            
+            document.getElementById('totalTime').textContent = 
+                `${totalHours.toString().padStart(2, '0')}:${totalMinutes.toString().padStart(2, '0')}:${totalSeconds.toString().padStart(2, '0')}`;
+            
+            const avgTimePerQuestion = totalTime / questions.length / (1000 * 60); // in minutes
+            document.getElementById('avgTime').textContent = `${avgTimePerQuestion.toFixed(1)} minutes`;
+
+            // Hide test interface and show results
+            document.getElementById('testInterface').classList.add('hidden');
+            document.getElementById('resultsSection').classList.remove('hidden');
+
+            showStatus(`Test completed! You scored ${scorePercent}%`, 'success');
+        }
+
+        // Review answers
+        function reviewAnswers() {
+            const reviewDiv = document.getElementById('answerReview');
+            const content = document.getElementById('reviewContent');
+            
+            let html = '';
+            
+            questions.forEach((question, index) => {
+                const userAnswer = userAnswers[index];
+                const isCorrect = userAnswer === question.ans;
+                const wasMarked = markedForReview.has(index);
+                
+                let statusClass = '';
+                let statusIcon = '';
+                let statusText = '';
+                
+                if (!userAnswer) {
+                    statusClass = 'text-gray-600';
+                    statusIcon = '○';
+                    statusText = 'Not Attempted';
+                } else if (isCorrect) {
+                    statusClass = 'text-green-600';
+                    statusIcon = '✓';
+                    statusText = 'Correct';
+                } else {
+                    statusClass = 'text-red-600';
+                    statusIcon = '✗';
+                    statusText = 'Incorrect';
+                }
+                
+                html += `
+                    <div class="mb-6 p-4 border rounded-lg">
+                        <div class="flex items-center justify-between mb-3">
+                            <h4 class="font-semibold text-gray-800">Question ${index + 1}</h4>
+                            <div class="flex items-center space-x-2">
+                                ${wasMarked ? '<span class="text-xs bg-yellow-100 text-yellow-700 px-2 py-1 rounded">Marked</span>' : ''}
+                                <span class="${statusClass} font-medium">${statusIcon} ${statusText}</span>
+                            </div>
+                        </div>
+                        <p class="text-gray-700 mb-3">${question.question}</p>
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-2 mb-3 text-sm">
+                            <div class="${userAnswer === 'A' ? (isCorrect ? 'bg-green-100' : 'bg-red-100') : ''} p-2 rounded">
+                                <strong>(A)</strong> ${question.optionA} ${userAnswer === 'A' ? '← Your Answer' : ''}
+                            </div>
+                            <div class="${userAnswer === 'B' ? (isCorrect ? 'bg-green-100' : 'bg-red-100') : ''} p-2 rounded">
+                                <strong>(B)</strong> ${question.optionB} ${userAnswer === 'B' ? '← Your Answer' : ''}
+                            </div>
+                            <div class="${userAnswer === 'C' ? (isCorrect ? 'bg-green-100' : 'bg-red-100') : ''} p-2 rounded">
+                                <strong>(C)</strong> ${question.optionC} ${userAnswer === 'C' ? '← Your Answer' : ''}
+                            </div>
+                            <div class="${userAnswer === 'D' ? (isCorrect ? 'bg-green-100' : 'bg-red-100') : ''} p-2 rounded">
+                                <strong>(D)</strong> ${question.optionD} ${userAnswer === 'D' ? '← Your Answer' : ''}
+                            </div>
+                        </div>
+                        <div class="bg-green-50 p-3 rounded">
+                            <strong class="text-green-800">Correct Answer: ${question.ans}</strong>
+                            <p class="text-green-700 mt-2 text-sm">${question.exp}</p>
+                        </div>
+                    </div>
+                `;
+            });
+            
+            content.innerHTML = html;
+            reviewDiv.classList.remove('hidden');
+            
+            // Scroll to review section
+            reviewDiv.scrollIntoView({ behavior: 'smooth' });
+        }
+
+        // Restart test
+        function restartTest() {
+            // Reset all variables
+            questions = [];
+            currentQuestionIndex = 0;
+            userAnswers = {};
+            markedForReview = new Set();
+            testStartTime = null;
+            
+            if (testTimer) {
+                clearInterval(testTimer);
+            }
+            
+            // Show config, hide others
+            document.getElementById('testConfig').classList.remove('hidden');
+            document.getElementById('testInterface').classList.add('hidden');
+            document.getElementById('resultsSection').classList.add('hidden');
+            document.getElementById('answerReview').classList.add('hidden');
+            
+            showStatus('Ready to start a new test!', 'success');
+        }
+
+        // Download results
+        function downloadResults() {
+            const subject = document.getElementById('testSubject').value;
+            const paper = document.getElementById('testPaper').value;
+            const unit = document.getElementById('testUnit').value || 'All Units';
+            
+            const correct = parseInt(document.getElementById('correctCount').textContent);
+            const incorrect = parseInt(document.getElementById('incorrectCount').textContent);
+            const unattempted = parseInt(document.getElementById('unattemptedCount').textContent);
+            const scorePercent = document.getElementById('scorePercent').textContent;
+            const totalTime = document.getElementById('totalTime').textContent;
+            const avgTime = document.getElementById('avgTime').textContent;
+            
+            let content = `UGC NET Mock Test Results\n`;
+            content += `=========================\n\n`;
+            content += `Test Date: ${new Date().toLocaleString()}\n`;
+            content += `Subject: ${subject}\n`;
+            content += `Paper: ${paper}\n`;
+            content += `Unit: ${unit}\n`;
+            content += `Total Questions: ${questions.length}\n\n`;
+            content += `PERFORMANCE SUMMARY\n`;
+            content += `-------------------\n`;
+            content += `Overall Score: ${scorePercent}\n`;
+            content += `Correct Answers: ${correct}\n`;
+            content += `Incorrect Answers: ${incorrect}\n`;
+            content += `Not Attempted: ${unattempted}\n`;
+            content += `Total Time Taken: ${totalTime}\n`;
+            content += `Average Time per Question: ${avgTime}\n\n`;
+            content += `DETAILED ANALYSIS\n`;
+            content += `-----------------\n`;
+            
+            questions.forEach((question, index) => {
+                const userAnswer = userAnswers[index] || 'Not Answered';
+                const isCorrect = userAnswers[index] === question.ans;
+                const status = !userAnswers[index] ? 'Not Attempted' : (isCorrect ? 'Correct' : 'Incorrect');
+                
+                content += `\nQuestion ${index + 1}: ${status}\n`;
+                content += `Q: ${question.question}\n`;
+                content += `Your Answer: ${userAnswer}\n`;
+                content += `Correct Answer: ${question.ans}\n`;
+                content += `---\n`;
+            });
+            
+            // Create and download file
+            const blob = new Blob([content], { type: 'text/plain' });
+            const url = window.URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `UGC_NET_Mock_Test_Results_${new Date().toISOString().split('T')[0]}.txt`;
+            document.body.appendChild(a);
+            a.click();
+            window.URL.revokeObjectURL(url);
+            document.body.removeChild(a);
+            
+            showStatus('Results downloaded successfully!', 'success');
+        }
+
+        // Keyboard navigation
+        function setupKeyboardNavigation() {
+            document.addEventListener('keydown', function(e) {
+                if (document.getElementById('testInterface').classList.contains('hidden')) return;
+                
+                switch(e.key) {
+                    case 'ArrowLeft':
+                        e.preventDefault();
+                        previousQuestion();
+                        break;
+                    case 'ArrowRight':
+                        e.preventDefault();
+                        nextQuestion();
+                        break;
+                    case '1':
+                    case 'a':
+                    case 'A':
+                        if (!e.ctrlKey && !e.altKey) {
+                            e.preventDefault();
+                            selectAnswerByKey('A');
+                        }
+                        break;
+                    case '2':
+                    case 'b':
+                    case 'B':
+                        if (!e.ctrlKey && !e.altKey) {
+                            e.preventDefault();
+                            selectAnswerByKey('B');
+                        }
+                        break;
+                    case '3':
+                    case 'c':
+                    case 'C':
+                        if (!e.ctrlKey && !e.altKey) {
+                            e.preventDefault();
+                            selectAnswerByKey('C');
+                        }
+                        break;
+                    case '4':
+                    case 'd':
+                    case 'D':
+                        if (!e.ctrlKey && !e.altKey) {
+                            e.preventDefault();
+                            selectAnswerByKey('D');
+                        }
+                        break;
+                    case 'r':
+                    case 'R':
+                        if (!e.ctrlKey && !e.altKey) {
+                            e.preventDefault();
+                            markForReview();
+                        }
+                        break;
+                    case 'Delete':
+                    case 'Backspace':
+                        if (!e.ctrlKey && !e.altKey) {
+                            e.preventDefault();
+                            clearAnswer();
+                        }
+                        break;
+                }
+            });
+        }
+
+        // Select answer by keyboard
+        function selectAnswerByKey(option) {
+            const input = document.getElementById(`option${option}`);
+            if (input) {
+                input.checked = true;
+                selectAnswer(option);
+            }
+        }
+
+        // Show status message
+        function showStatus(message, type) {
+            const statusDiv = document.getElementById('statusMessage');
+            statusDiv.textContent = message;
+            
+            let className = 'mt-4 p-3 rounded-lg ';
+            if (type === 'success') {
+                className += 'bg-green-100 text-green-800';
+            } else if (type === 'warning') {
+                className += 'bg-yellow-100 text-yellow-800';
+            } else {
+                className += 'bg-red-100 text-red-800';
+            }
+            
+            statusDiv.className = className;
+            statusDiv.classList.remove('hidden');
+            
+            setTimeout(() => {
+                statusDiv.classList.add('hidden');
+            }, 5000);
+        }
+    </script>
+</body>
+</html>

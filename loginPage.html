@@ -1,0 +1,208 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Welcome Back! ✨</title>
+  <!-- Tailwind CSS CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- Google Fonts for Poppins -->
+  <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+</head>
+<body class="font-poppins bg-gradient-to-br from-indigo-500 to-purple-600 min-h-screen flex items-center justify-center p-5" 
+      oncontextmenu="return false;" 
+      onkeydown="if(event.keyCode==123) return false;">
+  
+  <div class="login-container bg-white/95 rounded-3xl p-10 shadow-2xl max-w-md w-full transform transition-all duration-500 ease-out">
+
+    <div id="loginForm" class="login-form">
+      <div class="login-header text-center mb-8">
+        <h1 id="LoginPageHeading" class="text-gray-800 text-2xl font-semibold mb-2">Welcome Back! ✨</h1>
+        <p class="text-gray-600 text-sm">Please sign in to your account</p>
+      </div>
+      
+      <form id="loginFormElement">
+        <div class="form-group mb-5">
+          <label for="username" class="block text-gray-600 font-medium text-sm mb-2">Username</label>
+          <input type="text" id="username" name="username" required 
+                 class="w-full p-3 border-2 border-gray-200 rounded-lg text-base bg-gray-50 focus:outline-none focus:border-indigo-500 focus:bg-white focus:-translate-y-0.5 focus:shadow-lg transition-all duration-300">
+        </div>
+        
+        <div class="form-group mb-5">
+          <label for="password" class="block text-gray-600 font-medium text-sm mb-2">Password</label>
+          <input type="password" id="password" name="password" required 
+                 class="w-full p-3 border-2 border-gray-200 rounded-lg text-base bg-gray-50 focus:outline-none focus:border-indigo-500 focus:bg-white focus:-translate-y-0.5 focus:shadow-lg transition-all duration-300">
+        </div>
+        
+        <button type="submit" 
+                class="login-btn w-full p-4 bg-gradient-to-r from-indigo-500 to-purple-600 text-white rounded-lg text-base font-semibold hover:-translate-y-0.5 hover:shadow-xl transition-all duration-300 relative overflow-hidden" 
+                id="loginBtn">
+          <span id="btnText">Sign In</span>
+        </button>
+      </form>
+      
+      <div id="message" class="message mt-5 p-3 rounded-lg text-center font-medium opacity-0 translate-y-2.5 transition-all duration-300"></div>
+    </div>
+    
+    <div id="welcomeScreen" class="welcome-screen hidden text-center animate-fadeIn">
+      <h1 class="text-gray-800 text-4xl font-semibold mb-5">🎉 Welcome!</h1>
+      <p class="text-gray-600 text-lg mb-8">You have successfully logged in!</p>
+      <button class="logout-btn px-5 py-2.5 bg-gradient-to-r from-sky-300 to-blue-500 text-white rounded-lg font-medium hover:-translate-y-0.5 transition-transform duration-200" 
+              onclick="logout()">Proceed</button>
+    </div>
+  </div>
+
+  <!-- Firebase SDK -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/firebase/9.23.0/firebase-app-compat.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/firebase/9.23.0/firebase-firestore-compat.min.js"></script>
+
+  <script>
+    // Initialize Firebase
+    function initializeFirebase() {
+      try {
+        const firebaseConfig = {
+          apiKey: "AIzaSyC3Euw4CyPnMtHnyClV1tVmkNtfIFTXc9I",
+          authDomain: "sunilvox-1.firebaseapp.com",
+          projectId: "sunilvox-1",
+          storageBucket: "sunilvox-1.firebasestorage.app",  // ✅ looks okay
+          messagingSenderId: "1046912567084",
+          appId: "1:1046912567084:web:8a36a701601bfee59fce89",
+          measurementId: "G-C1GVJ38N09"
+        };
+        if (!firebase.apps.length) {
+          firebase.initializeApp(firebaseConfig);
+        }
+        console.log("Firebase initialized successfully");
+      } catch (error) {
+        console.error("Firebase initialization failed:", error);
+      }
+    }
+
+    initializeFirebase();
+    const db = firebase.firestore();
+
+    // DOM elements
+    const loginForm = document.getElementById('loginFormElement');
+    const loginBtn = document.getElementById('loginBtn');
+    const btnText = document.getElementById('btnText');
+    const messageDiv = document.getElementById('message');
+    const loginFormDiv = document.getElementById('loginForm');
+    const welcomeScreen = document.getElementById('welcomeScreen');
+    let role = "";
+    let userId = "";
+
+    // Login function
+    async function authenticateUser(username, password) {
+      try {
+        const usersRef = db.collection('users');
+        const query = usersRef.where('username', '==', username);
+        const snapshot = await query.get();
+
+        if (snapshot.empty) {
+          return { success: false, message: "Oops! User not found 🔍" };
+        }
+
+        let userFound = false;
+        snapshot.forEach(doc => {
+          const userData = doc.data();
+          if (userData.password === password) {
+            userFound = true;
+            role = userData.role || "";
+            userId = doc.id; // ✅ use Firestore doc.id instead of userData.id
+            sessionStorage.setItem('userRole', role);
+            sessionStorage.setItem('userId', userId);
+          }
+        });
+
+        if (userFound) {
+          return { success: true, message: "Welcome back! 🎉" };
+        } else {
+          return { success: false, message: "Hmm, that password doesn't look right 🤔" };
+        }
+      } catch (error) {
+        console.error('Authentication error:', error);
+        return { success: false, message: "Something went wrong. Please try again! 😅" };
+      }
+    }
+
+    // Show message function
+    function showMessage(text, type) {
+      messageDiv.textContent = text;
+      messageDiv.className = `message mt-5 p-3 rounded-lg text-center font-medium transition-all duration-300 ${
+        type === 'success' 
+          ? 'bg-gradient-to-r from-blue-500 to-cyan-500 text-white' 
+          : 'bg-gradient-to-r from-pink-500 to-yellow-500 text-white'
+      }`;
+    }
+
+    // Form submit handler
+    loginForm.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      try {
+        const username = document.getElementById('username').value.trim();
+        const password = document.getElementById('password').value;
+        if (!username || !password) {
+          showMessage("Please fill in all fields! 📝", "error");
+          return;
+        }
+
+        // Loading spinner
+        loginBtn.disabled = true;
+        loginBtn.classList.add('relative', 'pointer-events-none');
+        btnText.textContent = '...';
+
+        const result = await authenticateUser(username, password);
+
+        if (result.success) {
+          showMessage(result.message, "success");
+          setTimeout(() => {
+            window.location.href = 'NET.html';
+          }, 500);
+        } else {
+          showMessage(result.message, "error");
+        }
+      } catch (error) {
+        showMessage("Oops! Something unexpected happened 😅", "error");
+        console.error("Submit error:", error);
+      } finally {
+        loginBtn.disabled = false;
+        loginBtn.classList.remove('relative', 'pointer-events-none');
+        btnText.textContent = 'Sign In';
+      }
+    });
+
+    // Logout function
+    function logout() {
+      sessionStorage.setItem('isLogin', 'true');
+      window.location.href = `adminPanel.html?role=${role}`;
+    }
+
+    document.addEventListener('DOMContentLoaded', () => {
+      try {
+        sessionStorage.removeItem('isLogin');
+        const heading = document.getElementById('LoginPageHeading');
+        if (!heading) return;
+
+        const img = document.createElement('img');
+        img.src = "https://live.staticflickr.com/65535/54681641143_f57882f96a_n.jpg";
+        img.width = 25;
+        img.height = 25;
+        img.className = "inline-block mr-2 align-middle";
+        img.onerror = () => console.error("Failed to load image");
+        heading.prepend(img);
+      } catch (error) {
+        console.error("Error in DOMContentLoaded:", error);
+      }
+    });
+
+    // Animations
+    const style = document.createElement('style');
+    style.textContent = `
+      @keyframes slideIn { to { transform: translateY(0); opacity: 1; } }
+      @keyframes fadeIn { from { opacity: 0; transform: scale(0.9); } to { opacity: 1; transform: scale(1); } }
+      @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+    `;
+    document.head.appendChild(style);
+  </script>
+</body>
+</html>

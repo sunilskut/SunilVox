@@ -1,0 +1,600 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Study Materials Admin Panel</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/firebase/9.23.0/firebase-app-compat.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/firebase/9.23.0/firebase-firestore-compat.min.js"></script>
+</head>
+<body class="bg-gray-100 min-h-screen">
+    <div class="container mx-auto px-4 py-8 max-w-4xl">
+        <!-- Header -->
+        <header class="text-center mb-8">
+            <h1 class="text-4xl font-bold text-gray-800 mb-2">Study Materials Admin</h1>
+            <p class="text-gray-600">Add & Manage Study Materials</p>
+        </header>
+
+        <!-- Firebase Connection Status -->
+        <div class="bg-white rounded-lg shadow-md p-6 mb-6">
+            <div class="flex items-center justify-between">
+                <div class="flex items-center space-x-3">
+                    <div id="connectionDot" class="w-3 h-3 bg-red-500 rounded-full"></div>
+                    <div>
+                        <p class="font-medium text-gray-800">Firebase Status</p>
+                        <p id="connectionStatus" class="text-sm text-gray-600">Not Connected</p>
+                    </div>
+                </div>
+                <button onclick="initializeFirebase()" class="bg-blue-600 hover:bg-blue-700 text-white font-medium py-2 px-4 rounded-lg transition duration-200">
+                    Connect to Firebase
+                </button>
+            </div>
+        </div>
+
+        <!-- Add Material Form -->
+        <div class="bg-white rounded-lg shadow-md p-6 mb-6">
+            <h2 class="text-2xl font-semibold mb-6 text-gray-800">Add New Study Material</h2>
+            
+            <form id="materialForm" class="space-y-6">
+                <!-- Basic Information -->
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <div>
+                        <label for="subject" class="block text-sm font-medium text-gray-700 mb-2">Subject *</label>
+                        <select id="subject" required 
+                                class="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent">
+                            <option value="">Select Subject</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label for="paper" class="block text-sm font-medium text-gray-700 mb-2">Paper *</label>
+                        <select id="paper" required
+                                class="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent">
+                            <option value="">Select Paper</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label for="unit" class="block text-sm font-medium text-gray-700 mb-2">Unit *</label>
+                        <select id="unit" required
+                                class="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent">
+                            <option value="">Select Unit</option>
+                        </select>
+                    </div>
+                </div>
+
+                <!-- Unit Details Display -->
+                <div id="unitDetails" class="hidden bg-blue-50 p-4 rounded-lg">
+                    <h4 class="font-medium text-gray-800 mb-2">Unit Details</h4>
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
+                        <div>
+                            <span class="font-medium text-gray-700">Unit Title:</span>
+                            <p id="displayUnitTitle" class="text-gray-600 mt-1"></p>
+                        </div>
+                        <div>
+                            <span class="font-medium text-gray-700">Topics:</span>
+                            <p id="displayTopics" class="text-gray-600 mt-1"></p>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Title and Order -->
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                        <label for="title" class="block text-sm font-medium text-gray-700 mb-2">Title *</label>
+                        <input type="text" id="title" required
+                               class="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                               placeholder="Auto-filled from unit title">
+                    </div>
+                    <div>
+                        <label for="order" class="block text-sm font-medium text-gray-700 mb-2">Order *</label>
+                        <input type="number" id="order" required min="1"
+                               class="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                               placeholder="1">
+                    </div>
+                </div>
+
+                <!-- Content -->
+                <div>
+                    <label for="content" class="block text-sm font-medium text-gray-700 mb-2">Content *</label>
+                    <textarea id="content" required rows="15"
+                              class="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                              placeholder="Enter the study material content here..."></textarea>
+                    <p class="text-sm text-gray-500 mt-1">You can use line breaks for formatting. The content will be displayed with proper formatting in the reader.</p>
+                </div>
+
+                <!-- Action Buttons -->
+                <div class="flex items-center justify-between pt-4 border-t">
+                    <div class="flex space-x-3">
+                        <button type="submit" class="bg-green-600 hover:bg-green-700 text-white font-medium py-3 px-6 rounded-lg transition duration-200">
+                            Add Material
+                        </button>
+                        <button type="button" onclick="clearForm()" class="bg-gray-600 hover:bg-gray-700 text-white font-medium py-3 px-6 rounded-lg transition duration-200">
+                            Clear Form
+                        </button>
+                    </div>
+                    <button type="button" onclick="loadSampleData()" class="bg-blue-600 hover:bg-blue-700 text-white font-medium py-2 px-4 rounded-lg transition duration-200 text-sm">
+                        Load Sample
+                    </button>
+                </div>
+            </form>
+        </div>
+
+        <!-- Quick Stats -->
+        <div class="bg-white rounded-lg shadow-md p-6 mb-6">
+            <h3 class="text-lg font-semibold mb-4 text-gray-800">Quick Stats</h3>
+            <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
+                <div class="text-center p-4 bg-blue-50 rounded-lg">
+                    <div id="totalMaterials" class="text-2xl font-bold text-blue-600">0</div>
+                    <div class="text-sm text-gray-600">Total Materials</div>
+                </div>
+                <div class="text-center p-4 bg-green-50 rounded-lg">
+                    <div id="totalSubjects" class="text-2xl font-bold text-green-600">0</div>
+                    <div class="text-sm text-gray-600">Subjects</div>
+                </div>
+                <div class="text-center p-4 bg-purple-50 rounded-lg">
+                    <div id="totalPapers" class="text-2xl font-bold text-purple-600">0</div>
+                    <div class="text-sm text-gray-600">Papers</div>
+                </div>
+                <div class="text-center p-4 bg-yellow-50 rounded-lg">
+                    <div id="totalUnits" class="text-2xl font-bold text-yellow-600">0</div>
+                    <div class="text-sm text-gray-600">Units</div>
+                </div>
+            </div>
+            <div class="mt-4 text-center">
+                <button onclick="loadStats()" class="bg-indigo-600 hover:bg-indigo-700 text-white font-medium py-2 px-4 rounded-lg transition duration-200">
+                    Refresh Stats
+                </button>
+            </div>
+        </div>
+
+        <!-- Recent Materials -->
+        <div class="bg-white rounded-lg shadow-md p-6">
+            <div class="flex items-center justify-between mb-4">
+                <h3 class="text-lg font-semibold text-gray-800">Recent Materials</h3>
+                <button onclick="loadRecentMaterials()" class="bg-gray-600 hover:bg-gray-700 text-white font-medium py-2 px-3 rounded-lg transition duration-200 text-sm">
+                    Refresh
+                </button>
+            </div>
+            <div id="recentMaterials" class="space-y-3">
+                <p class="text-gray-500 text-center py-8">Connect to Firebase and add materials to see recent items</p>
+            </div>
+        </div>
+
+        <!-- Success/Error Messages -->
+        <div id="messageContainer" class="fixed top-4 right-4 z-50 space-y-2">
+            <!-- Messages will appear here -->
+        </div>
+    </div>
+
+    <script>
+        let db = null;
+        let isConnected = false;
+
+        function initializeFirebase() {
+            const firebaseConfig = {
+                apiKey: "AIzaSyC3Euw4CyPnMtHnyClV1tVmkNtfIFTXc9I",
+                authDomain: "sunilvox-1.firebaseapp.com",
+                projectId: "sunilvox-1",
+                storageBucket: "sunilvox-1.firebasestorage.app",
+                messagingSenderId: "1046912567084",
+                appId: "1:1046912567084:web:8a36a701601bfee59fce89",
+                measurementId: "G-C1GVJ38N09"
+            };
+
+            try {
+                const app = firebase.initializeApp(firebaseConfig);
+                db = firebase.firestore();
+                isConnected = true;
+                updateConnectionStatus(true, 'Connected to Firebase successfully!');
+                loadStats();
+                loadRecentMaterials();
+            } catch (error) {
+                console.error('Firebase initialization error:', error);
+                updateConnectionStatus(false, 'Error: ' + error.message);
+            }
+        }
+
+        function updateConnectionStatus(connected, message) {
+            const dot = document.getElementById('connectionDot');
+            const status = document.getElementById('connectionStatus');
+            
+            if (connected) {
+                dot.className = 'w-3 h-3 bg-green-500 rounded-full';
+                status.textContent = 'Connected';
+                status.className = 'text-sm text-green-600 font-medium';
+            } else {
+                dot.className = 'w-3 h-3 bg-red-500 rounded-full';
+                status.textContent = 'Not Connected';
+                status.className = 'text-sm text-red-600';
+            }
+        }
+
+        function showMessage(message, type = 'success') {
+            const container = document.getElementById('messageContainer');
+            const messageDiv = document.createElement('div');
+            
+            const bgColor = type === 'success' ? 'bg-green-500' : 'bg-red-500';
+            
+            messageDiv.className = `${bgColor} text-white px-4 py-3 rounded-lg shadow-lg transform transition-all duration-300 translate-x-full`;
+            messageDiv.innerHTML = `
+                <div class="flex items-center justify-between">
+                    <span>${message}</span>
+                    <button onclick="this.parentElement.parentElement.remove()" class="ml-4 text-white hover:text-gray-200">
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+                        </svg>
+                    </button>
+                </div>
+            `;
+            
+            container.appendChild(messageDiv);
+            
+            // Animate in
+            setTimeout(() => {
+                messageDiv.classList.remove('translate-x-full');
+                messageDiv.classList.add('translate-x-0');
+            }, 100);
+            
+            // Auto remove after 5 seconds
+            setTimeout(() => {
+                messageDiv.classList.add('translate-x-full');
+                setTimeout(() => {
+                    if (messageDiv.parentElement) {
+                        messageDiv.remove();
+                    }
+                }, 300);
+            }, 5000);
+        }
+
+        async function addMaterial(materialData) {
+            if (!isConnected || !db) {
+                showMessage('Please connect to Firebase first', 'error');
+                return false;
+            }
+
+            try {
+                await db.collection('studyMaterials').add({
+                    ...materialData,
+                    createdAt: firebase.firestore.FieldValue.serverTimestamp(),
+                    updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+                });
+                
+                showMessage('Study material added successfully!');
+                loadStats();
+                loadRecentMaterials();
+                return true;
+            } catch (error) {
+                console.error('Error adding material:', error);
+                showMessage('Error adding material: ' + error.message, 'error');
+                return false;
+            }
+        }
+
+        document.getElementById('materialForm').addEventListener('submit', async function(e) {
+            e.preventDefault();
+            
+            const materialData = {
+                subject: document.getElementById('subject').value.trim(),
+                paper: document.getElementById('paper').value.trim(),
+                unit: document.getElementById('unit').value.trim(),
+                title: document.getElementById('title').value.trim(),
+                content: document.getElementById('content').value.trim(),
+                order: parseInt(document.getElementById('order').value)
+            };
+
+            // Validation
+            if (!materialData.subject || !materialData.paper || !materialData.unit || 
+                !materialData.title || !materialData.content || !materialData.order) {
+                showMessage('Please fill in all required fields', 'error');
+                return;
+            }
+
+            const success = await addMaterial(materialData);
+            if (success) {
+                clearForm();
+            }
+        });
+
+        function clearForm() {
+            document.getElementById('materialForm').reset();
+        }
+
+        function loadSampleData() {
+            document.getElementById('subject').value = 'Computer Science';
+            document.getElementById('paper').value = 'Data Structures';
+            document.getElementById('unit').value = '1';
+            document.getElementById('title').value = 'Introduction to Arrays';
+            document.getElementById('order').value = '1';
+            document.getElementById('content').value = ``;
+        }
+
+        async function loadStats() {
+            if (!isConnected || !db) return;
+
+            try {
+                const snapshot = await db.collection('studyMaterials').get();
+                const materials = [];
+                
+                snapshot.forEach(doc => {
+                    materials.push(doc.data());
+                });
+
+                const subjects = new Set(materials.map(m => m.subject).filter(s => s));
+                const papers = new Set(materials.map(m => m.paper).filter(p => p));
+                const units = new Set(materials.map(m => m.unit).filter(u => u));
+
+                document.getElementById('totalMaterials').textContent = materials.length;
+                document.getElementById('totalSubjects').textContent = subjects.size;
+                document.getElementById('totalPapers').textContent = papers.size;
+                document.getElementById('totalUnits').textContent = units.size;
+            } catch (error) {
+                console.error('Error loading stats:', error);
+            }
+        }
+
+        async function loadRecentMaterials() {
+            if (!isConnected || !db) return;
+
+            const container = document.getElementById('recentMaterials');
+            container.innerHTML = '<p class="text-gray-500 text-center py-4">Loading...</p>';
+
+            try {
+                const snapshot = await db.collection('studyMaterials')
+                    .orderBy('createdAt', 'desc')
+                    .limit(5)
+                    .get();
+
+                if (snapshot.empty) {
+                    container.innerHTML = '<p class="text-gray-500 text-center py-4">No materials found</p>';
+                    return;
+                }
+
+                let html = '';
+                snapshot.forEach(doc => {
+                    const data = doc.data();
+                    const createdAt = data.createdAt ? data.createdAt.toDate().toLocaleDateString() : 'Unknown date';
+                    
+                    html += `
+                        <div class="flex items-center justify-between p-4 border border-gray-200 rounded-lg hover:bg-gray-50">
+                            <div class="flex-1">
+                                <h4 class="font-medium text-gray-800">${data.title || 'Untitled'}</h4>
+                                <div class="flex items-center space-x-2 text-sm text-gray-600 mt-1">
+                                    <span class="bg-blue-100 text-blue-800 px-2 py-1 rounded text-xs">${data.subject || 'N/A'}</span>
+                                    <span class="bg-green-100 text-green-800 px-2 py-1 rounded text-xs">${data.paper || 'N/A'}</span>
+                                    <span class="bg-purple-100 text-purple-800 px-2 py-1 rounded text-xs">Unit ${data.unit || 'N/A'}</span>
+                                </div>
+                            </div>
+                            <div class="text-right">
+                                <div class="text-sm text-gray-500">${createdAt}</div>
+                                <div class="text-xs text-gray-400">Order: ${data.order || 'N/A'}</div>
+                            </div>
+                        </div>
+                    `;
+                });
+
+                container.innerHTML = html;
+            } catch (error) {
+                console.error('Error loading recent materials:', error);
+                container.innerHTML = '<p class="text-red-500 text-center py-4">Error loading materials</p>';
+            }
+        }
+/*
+async function populateDropdowns() {
+    if (!isConnected || !db) {
+        console.error('Firebase not connected');
+        return;
+    }
+
+    try {
+        // Load syllabus data without ordering (to avoid index requirement)
+        const snapshot = await db.collection('syllabus').get();
+        
+        const syllabusData = [];
+        snapshot.forEach(doc => {
+            syllabusData.push({ id: doc.id, ...doc.data() });
+        });
+
+        // Sort data in JavaScript instead of Firestore
+        syllabusData.sort((a, b) => {
+            if (a.subject !== b.subject) return (a.subject || '').localeCompare(b.subject || '');
+            if (a.paper !== b.paper) return (a.paper || '').localeCompare(b.paper || '');
+            return (a.unit || '').localeCompare(b.unit || '');
+        });
+
+        // Get unique subjects
+        const subjects = [...new Set(syllabusData.map(item => item.subject).filter(s => s))];
+        
+        // Populate subject dropdown
+        const subjectSelect = document.getElementById('subject');
+        subjectSelect.innerHTML = '<option value="">Select Subject</option>';
+        subjects.forEach(subject => {
+            const option = document.createElement('option');
+            option.value = subject;
+            option.textContent = subject;
+            subjectSelect.appendChild(option);
+        });
+
+        // Subject change handler
+        subjectSelect.addEventListener('change', function() {
+            const selectedSubject = this.value;
+            const paperSelect = document.getElementById('paper');
+            const unitSelect = document.getElementById('unit');
+            
+            // Reset dependent dropdowns
+            paperSelect.innerHTML = '<option value="">Select Paper</option>';
+            unitSelect.innerHTML = '<option value="">Select Unit</option>';
+
+            if (!selectedSubject) return;
+
+            // Get papers for selected subject
+            const papers = [...new Set(syllabusData
+                .filter(item => item.subject === selectedSubject)
+                .map(item => item.paper)
+                .filter(p => p))];
+
+            papers.forEach(paper => {
+                const option = document.createElement('option');
+                option.value = paper;
+                option.textContent = paper;
+                paperSelect.appendChild(option);
+            });
+        });
+
+        // Paper change handler
+        document.getElementById('paper').addEventListener('change', function() {
+            const selectedSubject = document.getElementById('subject').value;
+            const selectedPaper = this.value;
+            const unitSelect = document.getElementById('unit');
+            
+            // Reset unit dropdown
+            unitSelect.innerHTML = '<option value="">Select Unit</option>';
+
+            if (!selectedSubject || !selectedPaper) return;
+
+            // Get units for selected subject and paper
+            const units = syllabusData
+                .filter(item => item.subject === selectedSubject && item.paper === selectedPaper)
+                .map(item => item.unit)
+                .filter(u => u);
+
+            units.forEach(unit => {
+                const option = document.createElement('option');
+                option.value = unit;
+                option.textContent = unit;
+                unitSelect.appendChild(option);
+            });
+        });
+
+    } catch (error) {
+        console.error('Error populating dropdowns:', error);
+    }
+}
+*/
+async function populateDropdowns() {
+    if (!isConnected || !db) {
+        console.error('Firebase not connected');
+        return;
+    }
+
+    try {
+        // Load syllabus data without ordering (to avoid index requirement)
+        const snapshot = await db.collection('syllabus').get();
+        
+        const syllabusData = [];
+        snapshot.forEach(doc => {
+            syllabusData.push({ id: doc.id, ...doc.data() });
+        });
+
+        // Sort data in JavaScript instead of Firestore
+        syllabusData.sort((a, b) => {
+            if (a.subject !== b.subject) return (a.subject || '').localeCompare(b.subject || '');
+            if (a.paper !== b.paper) return (a.paper || '').localeCompare(b.paper || '');
+            return (a.unit || '').localeCompare(b.unit || '');
+        });
+
+        // Get unique subjects
+        const subjects = [...new Set(syllabusData.map(item => item.subject).filter(s => s))];
+        
+        // Populate subject dropdown
+        const subjectSelect = document.getElementById('subject');
+        subjectSelect.innerHTML = '<option value="">Select Subject</option>';
+        subjects.forEach(subject => {
+            const option = document.createElement('option');
+            option.value = subject;
+            option.textContent = subject;
+            subjectSelect.appendChild(option);
+        });
+
+        // Subject change handler
+        subjectSelect.addEventListener('change', function() {
+            const selectedSubject = this.value;
+            const paperSelect = document.getElementById('paper');
+            const unitSelect = document.getElementById('unit');
+            const titleField = document.getElementById('title');
+            
+            // Reset dependent dropdowns and title
+            paperSelect.innerHTML = '<option value="">Select Paper</option>';
+            unitSelect.innerHTML = '<option value="">Select Unit</option>';
+            titleField.value = '';
+
+            if (!selectedSubject) return;
+
+            // Get papers for selected subject
+            const papers = [...new Set(syllabusData
+                .filter(item => item.subject === selectedSubject)
+                .map(item => item.paper)
+                .filter(p => p))];
+
+            papers.forEach(paper => {
+                const option = document.createElement('option');
+                option.value = paper;
+                option.textContent = paper;
+                paperSelect.appendChild(option);
+            });
+        });
+
+        // Paper change handler
+        document.getElementById('paper').addEventListener('change', function() {
+            const selectedSubject = document.getElementById('subject').value;
+            const selectedPaper = this.value;
+            const unitSelect = document.getElementById('unit');
+            const titleField = document.getElementById('title');
+            
+            // Reset unit dropdown and title
+            unitSelect.innerHTML = '<option value="">Select Unit</option>';
+            titleField.value = '';
+
+            if (!selectedSubject || !selectedPaper) return;
+
+            // Get units for selected subject and paper
+            const units = syllabusData
+                .filter(item => item.subject === selectedSubject && item.paper === selectedPaper)
+                .map(item => item.unit)
+                .filter(u => u);
+
+            units.forEach(unit => {
+                const option = document.createElement('option');
+                option.value = unit;
+                option.textContent = unit;
+                unitSelect.appendChild(option);
+            });
+        });
+
+        // Unit change handler - Auto-fill title
+        document.getElementById('unit').addEventListener('change', function() {
+            const selectedSubject = document.getElementById('subject').value;
+            const selectedPaper = document.getElementById('paper').value;
+            const selectedUnit = this.value;
+            const titleField = document.getElementById('title');
+
+            if (!selectedSubject || !selectedPaper || !selectedUnit) {
+                titleField.value = '';
+                return;
+            }
+
+            // Find the matching syllabus item and auto-fill title
+            const matchingSyllabusItem = syllabusData.find(item => 
+                item.subject === selectedSubject && 
+                item.paper === selectedPaper && 
+                item.unit === selectedUnit
+            );
+
+            if (matchingSyllabusItem && matchingSyllabusItem.unitTitle) {
+                titleField.value = matchingSyllabusItem.unitTitle;
+            } else {
+                titleField.value = '';
+            }
+        });
+
+    } catch (error) {
+        console.error('Error populating dropdowns:', error);
+    }
+}
+        // Auto-initialize Firebase on page load
+        window.addEventListener('DOMContentLoaded', function() {
+            initializeFirebase();
+	    populateDropdowns();
+        });
+    </script>
+</body>
+</html>
